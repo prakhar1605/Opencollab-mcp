@@ -7,8 +7,8 @@ name = "opencollab-mcp"
 version = "0.1.0"
 description = "AI-powered open source contribution matchmaker — finds perfect 'good first issues' matched to YOUR skills"
 readme = "README.md"
+license = { "MIT" }
 requires-python = ">=3.10"
-license = "MIT"
 authors = [
     { name = "Prakhar Pandey", email = "prakhar9999pandey@gmail.com" },
 ]
@@ -33,3 +33,4 @@ opencollab-mcp = "opencollab_mcp.server:main"
 Homepage = "https://github.com/PrakharPandey/opencollab-mcp"
 Repository = "https://github.com/PrakharPandey/opencollab-mcp"
 Issues = "https://github.com/PrakharPandey/opencollab-mcp/issues"
+

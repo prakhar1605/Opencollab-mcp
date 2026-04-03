@@ -28,14 +28,17 @@ Go to [github.com/settings/tokens](https://github.com/settings/tokens) → **Gen
 
 ### 2. Install in Claude Desktop
 
-Add this to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on Mac):
+Add this to your Claude Desktop config:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["opencollab-mcp"],
+      "args": ["--from", "git+https://github.com/PrakharPandey/opencollab-mcp.git", "opencollab-mcp"],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
@@ -55,7 +58,28 @@ Add to `.cursor/mcp.json` or VS Code MCP config:
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["opencollab-mcp"],
+      "args": ["--from", "git+https://github.com/PrakharPandey/opencollab-mcp.git", "opencollab-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token_here"
+      }
+    }
+  }
+}
+```
+
+### 4. Alternative: Install with pip
+
+```bash
+pip install git+https://github.com/PrakharPandey/opencollab-mcp.git
+```
+
+Then use `opencollab-mcp` as the command (no `uvx` needed):
+
+```json
+{
+  "mcpServers": {
+    "opencollab": {
+      "command": "opencollab-mcp",
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
