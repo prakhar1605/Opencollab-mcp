@@ -1,4 +1,4 @@
-# 🚀 OpenCollab MCP
+#  OpenCollab MCP
 
 **AI-powered open source contribution matchmaker** — finds perfect "good first issues" matched to YOUR skills.
 
