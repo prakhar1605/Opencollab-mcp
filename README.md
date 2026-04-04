@@ -38,7 +38,7 @@ Add this to your Claude Desktop config:
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/PrakharPandey/opencollab-mcp.git", "opencollab-mcp"],
+      "args": ["--from", "git+https://github.com/prakhar1605/Opencollab-mcp.git", "opencollab-mcp"],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
@@ -58,7 +58,7 @@ Add to `.cursor/mcp.json` or VS Code MCP config:
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/PrakharPandey/opencollab-mcp.git", "opencollab-mcp"],
+      "args": ["--from", "git+https://github.com/prakhar1605/Opencollab-mcp.git", "opencollab-mcp"],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
@@ -70,7 +70,7 @@ Add to `.cursor/mcp.json` or VS Code MCP config:
 ### 4. Alternative: Install with pip
 
 ```bash
-pip install git+https://github.com/PrakharPandey/opencollab-mcp.git
+pip install git+https://github.com/prakhar1605/Opencollab-mcp.git
 ```
 
 Then use `opencollab-mcp` as the command (no `uvx` needed):
@@ -122,8 +122,8 @@ Then use `opencollab-mcp` as the command (no `uvx` needed):
 
 ```bash
 # Clone
-git clone https://github.com/PrakharPandey/opencollab-mcp.git
-cd opencollab-mcp
+git clone https://github.com/prakhar1605/Opencollab-mcp.git
+cd Opencollab-mcp
 
 # Install in development mode
 pip install -e .
@@ -172,4 +172,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-**Built by [Prakhar Pandey](https://github.com/PrakharPandey)** — IIT Guwahati | AI Engineer
+**Built by [Prakhar Pandey](https://github.com/prakhar1605)** — IIT Guwahati | AI Engineer

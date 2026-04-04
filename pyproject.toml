@@ -30,6 +30,6 @@ dependencies = [
 opencollab-mcp = "opencollab_mcp.server:main"
 
 [project.urls]
-Homepage = "https://github.com/PrakharPandey/opencollab-mcp"
-Repository = "https://github.com/PrakharPandey/opencollab-mcp"
-Issues = "https://github.com/PrakharPandey/opencollab-mcp/issues"
+Homepage = "https://github.com/prakhar1605/Opencollab-mcp"
+Repository = "https://github.com/prakhar1605/Opencollab-mcp"
+Issues = "https://github.com/prakhar1605/Opencollab-mcp/issues"

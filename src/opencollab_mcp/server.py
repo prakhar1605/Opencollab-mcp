@@ -145,25 +145,6 @@ async def opencollab_analyze_profile(params: AnalyzeProfileInput) -> str:
 # Tool 2 — find_issues
 # ---------------------------------------------------------------------------
 
-class FindIssuesInput(BaseModel):
-    """Input for finding contribution-ready issues."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    language: str = Field(
-        ...,
-        description="Primary programming language to filter by (e.g. 'Python', 'TypeScript', 'Rust')",
-        min_length=1,
-    )
-    topic: str = Field(
-        default="",
-        description="Optional topic/domain to narrow search (e.g. 'machine-learning', 'web', 'cli')",
-    )
-    max_results: int = Field(
-        default=15,
-        description="Number of issues to return (1-30)",
-        ge=1,
-        le=30,
-    )
-
 
 @mcp.tool(
     name="opencollab_find_issues",
@@ -175,29 +156,39 @@ class FindIssuesInput(BaseModel):
         "openWorldHint": True,
     },
 )
-async def opencollab_find_issues(params: FindIssuesInput) -> str:
+async def opencollab_find_issues(
+    language: str,
+    topic: str = "",
+    max_results: int = 15,
+) -> str:
     """Find beginner-friendly open-source issues matched to a developer's skills.
 
     Searches GitHub for issues labelled 'good first issue' or 'help wanted'
     in the specified language/topic, filtered to recently active repos.
     Returns structured issue data including repo health signals.
+
+    Args:
+        language: Primary programming language to filter by (e.g. 'Python', 'TypeScript', 'Rust')
+        topic: Optional topic/domain to narrow search (e.g. 'machine-learning', 'web', 'cli')
+        max_results: Number of issues to return (1-30, default 15)
     """
+    max_results = max(1, min(max_results, 30))
     since = _recent_date_str(90)
     query_parts = [
-        f"language:{params.language}",
+        f"language:{language}",
         "label:\"good first issue\"",
         "state:open",
         f"created:>{since}",
         "is:public",
     ]
-    if params.topic:
-        query_parts.insert(0, params.topic)
+    if topic:
+        query_parts.insert(0, topic)
 
     query = " ".join(query_parts)
 
     try:
         result = await github_search(
-            "issues", query, {"sort": "created", "order": "desc", "per_page": params.max_results}
+            "issues", query, {"sort": "created", "order": "desc", "per_page": max_results}
         )
     except Exception as e:
         return handle_github_error(e)
@@ -455,13 +446,6 @@ async def opencollab_contribution_readiness(params: ContribReadinessInput) -> st
 # Tool 5 — generate_pr_plan
 # ---------------------------------------------------------------------------
 
-class PRPlanInput(BaseModel):
-    """Input for generating a PR plan from an issue."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    owner: str = Field(..., description="Repository owner", min_length=1)
-    repo: str = Field(..., description="Repository name", min_length=1)
-    issue_number: int = Field(..., description="Issue number to plan a PR for", ge=1)
-
 
 @mcp.tool(
     name="opencollab_generate_pr_plan",
@@ -473,18 +457,27 @@ class PRPlanInput(BaseModel):
         "openWorldHint": True,
     },
 )
-async def opencollab_generate_pr_plan(params: PRPlanInput) -> str:
+async def opencollab_generate_pr_plan(
+    owner: str,
+    repo: str,
+    issue_number: int,
+) -> str:
     """Gather full context about a GitHub issue so the AI can draft a PR plan.
 
     Fetches the issue body, comments, labels, linked PRs, repo language,
     contributing guidelines, and directory structure to provide the AI
     with everything needed to suggest a concrete implementation approach.
+
+    Args:
+        owner: Repository owner (e.g. 'langchain-ai')
+        repo: Repository name (e.g. 'langchain')
+        issue_number: Issue number to plan a PR for (e.g. 123)
     """
-    path = f"/repos/{params.owner}/{params.repo}"
+    path = f"/repos/{owner}/{repo}"
     try:
-        issue = await github_get(f"{path}/issues/{params.issue_number}")
+        issue = await github_get(f"{path}/issues/{issue_number}")
         comments_raw = await github_get(
-            f"{path}/issues/{params.issue_number}/comments", {"per_page": 20}
+            f"{path}/issues/{issue_number}/comments", {"per_page": 20}
         )
         repo_info = await github_get(path)
     except Exception as e:
@@ -524,11 +517,11 @@ async def opencollab_generate_pr_plan(params: PRPlanInput) -> str:
     labels = [lb.get("name", "") for lb in issue.get("labels", [])]
 
     context = {
-        "repo": f"{params.owner}/{params.repo}",
+        "repo": f"{owner}/{repo}",
         "primary_language": repo_info.get("language"),
         "default_branch": repo_info.get("default_branch", "main"),
         "issue": {
-            "number": params.issue_number,
+            "number": issue_number,
             "title": issue.get("title", ""),
             "body": _truncate(issue.get("body"), 1500),
             "labels": labels,
