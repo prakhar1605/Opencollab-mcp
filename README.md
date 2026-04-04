@@ -1,4 +1,4 @@
-#  OpenCollab MCP
+# 🚀 OpenCollab MCP
 
 **AI-powered open source contribution matchmaker** — finds perfect "good first issues" matched to YOUR skills.
 
@@ -17,6 +17,11 @@ Stop scrolling through random issues. Let AI analyze your GitHub profile and fin
 | `opencollab_generate_pr_plan` | Gathers full issue context so AI can draft a PR plan |
 | `opencollab_trending_repos` | Finds trending repos actively seeking contributors |
 | `opencollab_impact_estimator` | Estimates contribution impact — stars, reach, resume line |
+| `opencollab_match_me` | **All-in-one**: analyzes your profile + finds matched issues in one step |
+| `opencollab_compare_repos` | Compare two repos side-by-side for contributor-friendliness |
+| `opencollab_check_issue_availability` | Check if an issue is still free — no assignees, no open PRs |
+| `opencollab_contributor_leaderboard` | See top contributors of any repo with commit counts |
+| `opencollab_stale_issue_finder` | Find old unclaimed issues — hidden easy wins no one is working on |
 
 ---
 
@@ -92,11 +97,35 @@ Then use `opencollab-mcp` as the command (no `uvx` needed):
 
 ## Example conversations
 
-### "Analyze my profile and find me issues"
+### "Match me with issues"
 
-> **You:** Analyze my GitHub profile (username: prakhar9999) and then find me beginner Python issues in AI/ML projects.
+> **You:** My GitHub username is prakhar1605. Find me open source issues I can contribute to.
 >
-> **Claude:** *analyzes profile → finds matching issues → ranks by relevance*
+> **Claude:** *analyzes profile → finds your top language → returns matched issues instantly*
+
+### "Compare two repos"
+
+> **You:** I'm choosing between langchain-ai/langchain and run-llama/llama_index to contribute to. Compare them.
+>
+> **Claude:** *fetches both repos → compares stars, PR merge rate, activity → recommends one*
+
+### "Is this issue still available?"
+
+> **You:** Check if issue #456 in facebook/react is still available to work on.
+>
+> **Claude:** *checks assignees, linked PRs → tells you if it's free or already claimed*
+
+### "Who are the top contributors?"
+
+> **You:** Show me the top contributors of microsoft/vscode.
+>
+> **Claude:** *fetches leaderboard with commit counts and profile links*
+
+### "Find hidden gems"
+
+> **You:** Find old unclaimed issues in fastapi/fastapi that no one is working on.
+>
+> **Claude:** *finds stale issues with no assignees — easy wins others overlooked*
 
 ### "Is this repo good to contribute to?"
 

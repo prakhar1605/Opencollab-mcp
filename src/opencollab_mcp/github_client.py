@@ -15,7 +15,7 @@ def _get_headers() -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "opencollab-mcp/0.1.0",
+        "User-Agent": "opencollab-mcp/0.2.0",
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
