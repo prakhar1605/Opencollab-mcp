@@ -4,7 +4,8 @@
 
 Stop scrolling through random issues. Let AI analyze your GitHub profile and find contributions you're actually qualified for, in repos that are actually maintained.
 
----
+--- 
+
 
 ## What it does
 
