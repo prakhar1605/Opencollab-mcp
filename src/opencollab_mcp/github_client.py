@@ -5,7 +5,7 @@ import json
 from typing import Any, Optional
 import httpx
 
-GITHUB_API_BASE = "https://api.github.com"
+GITHUB_API_BASE = "https://api.github.com" 
 DEFAULT_TIMEOUT = 30.0 
 
  
