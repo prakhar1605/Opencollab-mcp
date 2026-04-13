@@ -7,7 +7,7 @@ Stop scrolling through random issues. Let AI analyze your GitHub profile and fin
 --- 
  
 
-## What it does
+## What it does 
 
 | Tool | What it does |
 |---|---|
