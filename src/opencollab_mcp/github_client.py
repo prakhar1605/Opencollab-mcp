@@ -6,7 +6,7 @@ from typing import Any, Optional
 import httpx
 
 GITHUB_API_BASE = "https://api.github.com"
-DEFAULT_TIMEOUT = 30.0
+DEFAULT_TIMEOUT = 30.0 
 
 
 def _get_headers() -> dict[str, str]:
