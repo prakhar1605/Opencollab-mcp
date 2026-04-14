@@ -16,7 +16,7 @@ from .github_client import github_get, github_search, handle_github_error
  
 mcp = FastMCP("opencollab_mcp") 
 
-
+ 
 def _days_ago(iso_str: str | None) -> int | None:
     if not iso_str: 
         return None
