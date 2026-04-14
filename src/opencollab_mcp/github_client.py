@@ -13,7 +13,7 @@ def _get_headers() -> dict[str, str]:
     """Build auth headers from environment."""
     token = os.environ.get("GITHUB_TOKEN", "")
     headers = {
-        "Accept": "application/vnd.github+json",
+        "Accept": "application/vnd.github+json", 
         "X-GitHub-Api-Version": "2022-11-28", 
         "User-Agent": "opencollab-mcp/0.2.0",
     }
