@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
   
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, Field, ConfigDict  
+from pydantic import BaseModel, Field, ConfigDict   
   
 from .github_client import github_get, github_search, handle_github_error 
  
