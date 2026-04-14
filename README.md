@@ -23,6 +23,11 @@ Stop scrolling through random issues. Let AI analyze your GitHub profile and fin
 | `opencollab_check_issue_availability` | Check if an issue is still free — no assignees, no open PRs |
 | `opencollab_contributor_leaderboard` | See top contributors of any repo with commit counts |
 | `opencollab_stale_issue_finder` | Find old unclaimed issues — hidden easy wins no one is working on |
+| `opencollab_label_explorer` | Explore all labels in a repo — find beginner-friendly tags |
+| `opencollab_recent_prs` | See recent merged PRs — what kind of contributions get accepted |
+| `opencollab_repo_activity_pulse` | Activity pulse for last 30 days — is the repo alive or dying? |
+| `opencollab_find_mentor_repos` | Find repos with mentorship programs (GSoC, Hacktoberfest, Outreachy) |
+| `opencollab_issue_complexity` | Estimate complexity of a specific issue — beginner to expert rating |
 
 ---
 
@@ -145,6 +150,30 @@ Then use `opencollab-mcp` as the command (no `uvx` needed):
 > **You:** How impactful would it be to contribute to facebook/react?
 >
 > **Claude:** Impact tier: MASSIVE. 230k+ stars. Suggested resume line: "Contributed to a project used by tens of thousands of developers"
+
+### "What labels should I look for?"
+
+> **You:** Show me all the labels in fastapi/fastapi and which ones are beginner-friendly.
+>
+> **Claude:** *lists all labels → highlights 'good first issue', 'help wanted', 'docs' as beginner-friendly*
+
+### "How complex is this issue?"
+
+> **You:** How hard is issue #5432 in pytorch/pytorch? Am I ready for it?
+>
+> **Claude:** Complexity: 7/10 (Advanced). Long description, 12 comments, linked to architecture label. Suggests deep codebase knowledge.
+
+### "Find me a mentored project"
+
+> **You:** Find Python repos that have mentorship programs or GSoC/Hacktoberfest.
+>
+> **Claude:** *finds repos tagged with gsoc, hacktoberfest, mentorship — sorted by mentor signals*
+
+### "Is this repo still alive?"
+
+> **You:** What's the activity pulse of tensorflow/tensorflow in the last 30 days?
+>
+> **Claude:** 847 commits, momentum: Growing (+23%). Very active — safe to contribute.
 
 ---
 

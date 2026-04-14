@@ -433,6 +433,187 @@ async def opencollab_stale_issue_finder(params: RepoInput) -> str:
     return json.dumps({"repo": f"{params.owner}/{params.repo}", "stale_unclaimed_issues": stale, "count": len(stale)}, indent=2)
 
 
+# ========================== TOOL 13: label_explorer ==========================
+
+@mcp.tool(name="opencollab_label_explorer", annotations={"title": "Explore all labels in a repo with issue counts", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_label_explorer(params: RepoInput) -> str:
+    """List all labels in a repository with their descriptions and open issue counts.
+
+    Helps contributors discover which labels mark beginner-friendly issues,
+    bugs, features, documentation tasks, and more.
+    """
+    try:
+        labels_raw = await github_get(f"/repos/{params.owner}/{params.repo}/labels", {"per_page": 100})
+    except Exception as e:
+        return handle_github_error(e)
+    beginner_keywords = {"good first issue", "beginner", "easy", "starter", "help wanted", "first-timers-only", "up-for-grabs", "newcomer", "low-hanging-fruit"}
+    labels = []
+    beginner_labels = []
+    for lb in labels_raw:
+        name = lb.get("name", "")
+        entry = {"name": name, "description": lb.get("description") or "", "color": lb.get("color", "")}
+        labels.append(entry)
+        if name.lower() in beginner_keywords or any(kw in name.lower() for kw in beginner_keywords):
+            beginner_labels.append(name)
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "total_labels": len(labels), "beginner_friendly_labels": beginner_labels, "all_labels": labels}, indent=2)
+
+
+# ========================== TOOL 14: recent_prs ==========================
+
+@mcp.tool(name="opencollab_recent_prs", annotations={"title": "Show recent merged PRs in a repo", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_recent_prs(params: RepoInput) -> str:
+    """Show recently merged pull requests in a repository.
+
+    Helps contributors see what kind of PRs get accepted, how fast they're
+    merged, and who the active reviewers are.
+    """
+    try:
+        pulls = await github_get(f"/repos/{params.owner}/{params.repo}/pulls", {"state": "closed", "sort": "updated", "direction": "desc", "per_page": 30})
+    except Exception as e:
+        return handle_github_error(e)
+    merged = []
+    for pr in pulls:
+        if not pr.get("merged_at"):
+            continue
+        created = pr.get("created_at", "")
+        merged_at = pr.get("merged_at", "")
+        days_to_merge = None
+        if created and merged_at:
+            try:
+                c = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                m = datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
+                days_to_merge = (m - c).days
+            except Exception:
+                pass
+        merged.append({"title": pr.get("title", ""), "url": pr.get("html_url", ""), "author": pr.get("user", {}).get("login", "unknown"), "merged_days_ago": _days_ago(merged_at), "days_to_merge": days_to_merge, "additions": pr.get("additions", 0), "deletions": pr.get("deletions", 0), "labels": [lb.get("name", "") for lb in pr.get("labels", [])]})
+        if len(merged) >= 10:
+            break
+    avg_merge_time = None
+    merge_times = [p["days_to_merge"] for p in merged if p["days_to_merge"] is not None]
+    if merge_times:
+        avg_merge_time = round(sum(merge_times) / len(merge_times), 1)
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "recent_merged_prs": merged, "average_days_to_merge": avg_merge_time, "count": len(merged)}, indent=2)
+
+
+# ========================== TOOL 15: repo_activity_pulse ==========================
+
+@mcp.tool(name="opencollab_repo_activity_pulse", annotations={"title": "Get repo activity pulse for last 30 days", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_repo_activity_pulse(params: RepoInput) -> str:
+    """Get an activity pulse for a repo over the last 30 days.
+
+    Shows commit frequency, issue open/close rate, PR activity, and whether
+    the project is gaining or losing momentum.
+    """
+    path = f"/repos/{params.owner}/{params.repo}"
+    try:
+        repo = await github_get(path)
+        commit_activity = await github_get(f"{path}/stats/commit_activity")
+        participation = await github_get(f"{path}/stats/participation")
+    except Exception as e:
+        return handle_github_error(e)
+    recent_4_weeks = commit_activity[-4:] if isinstance(commit_activity, list) and len(commit_activity) >= 4 else []
+    weekly_commits = [w.get("total", 0) for w in recent_4_weeks]
+    total_30d = sum(weekly_commits)
+    prev_4_weeks = commit_activity[-8:-4] if isinstance(commit_activity, list) and len(commit_activity) >= 8 else []
+    prev_total = sum(w.get("total", 0) for w in prev_4_weeks)
+    if prev_total > 0:
+        momentum_pct = round((total_30d - prev_total) / prev_total * 100, 1)
+    elif total_30d > 0:
+        momentum_pct = 100.0
+    else:
+        momentum_pct = 0.0
+    if momentum_pct > 20: momentum = "Growing — more active than last month"
+    elif momentum_pct > -20: momentum = "Stable — consistent activity"
+    elif total_30d == 0: momentum = "Inactive — no commits in 30 days"
+    else: momentum = "Declining — less active than last month"
+    owner_commits = []
+    all_commits = []
+    if isinstance(participation, dict):
+        owner_commits = (participation.get("owner") or [])[-4:]
+        all_commits = (participation.get("all") or [])[-4:]
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "last_30_days": {"total_commits": total_30d, "weekly_breakdown": weekly_commits, "owner_weekly_commits": owner_commits, "all_weekly_commits": all_commits}, "momentum": momentum, "momentum_change_pct": momentum_pct, "stars": repo.get("stargazers_count", 0), "open_issues": repo.get("open_issues_count", 0), "last_push_days_ago": _days_ago(repo.get("pushed_at"))}, indent=2)
+
+
+# ========================== TOOL 16: find_mentor_repos ==========================
+
+@mcp.tool(name="opencollab_find_mentor_repos", annotations={"title": "Find repos with mentorship programs for beginners", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_find_mentor_repos(params: LanguageInput) -> str:
+    """Find repositories that actively mentor newcomers.
+
+    Searches for repos with mentorship labels, extensive contributing guides,
+    and programs like GSoC, Outreachy, or Hacktoberfest.
+    """
+    since = _recent_date_str(180)
+    queries = [
+        f"language:{params.language} topic:hacktoberfest good-first-issues:>3 pushed:>{since}",
+        f"language:{params.language} topic:gsoc good-first-issues:>1 pushed:>{since}",
+        f"language:{params.language} topic:mentorship good-first-issues:>1 pushed:>{since}",
+    ]
+    seen = set()
+    repos = []
+    for q in queries:
+        try:
+            result = await github_search("repositories", q, {"sort": "stars", "order": "desc", "per_page": 8})
+        except Exception:
+            continue
+        for r in result.get("items", []):
+            name = r.get("full_name", "")
+            if name in seen:
+                continue
+            seen.add(name)
+            topics = r.get("topics", [])
+            mentor_signals = [t for t in topics if t in ("hacktoberfest", "gsoc", "outreachy", "mentorship", "good-first-issue", "beginner-friendly", "first-timers-only")]
+            repos.append({"name": name, "description": _truncate(r.get("description"), 150), "stars": r.get("stargazers_count", 0), "language": r.get("language"), "mentor_signals": mentor_signals, "topics": topics[:8], "url": r.get("html_url", ""), "open_issues": r.get("open_issues_count", 0), "last_push_days_ago": _days_ago(r.get("pushed_at"))})
+    repos.sort(key=lambda x: len(x.get("mentor_signals", [])), reverse=True)
+    return json.dumps({"language": params.language, "mentor_repos": repos[:15], "count": len(repos[:15])}, indent=2)
+
+
+# ========================== TOOL 17: issue_complexity ==========================
+
+@mcp.tool(name="opencollab_issue_complexity", annotations={"title": "Estimate complexity of a specific issue", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_issue_complexity(params: IssueInput) -> str:
+    """Estimate the complexity of a specific GitHub issue.
+
+    Analyzes issue body length, number of comments, labels, linked PRs,
+    and discussion depth to produce a complexity rating.
+    """
+    issue_num = int(params.issue_number)
+    path = f"/repos/{params.owner}/{params.repo}"
+    try:
+        issue = await github_get(f"{path}/issues/{issue_num}")
+    except Exception as e:
+        return handle_github_error(e)
+    body = issue.get("body") or ""
+    body_len = len(body)
+    comments_count = issue.get("comments", 0)
+    labels = [lb.get("name", "").lower() for lb in issue.get("labels", [])]
+    easy_labels = {"good first issue", "beginner", "easy", "starter", "help wanted", "low-hanging-fruit", "trivial", "documentation"}
+    hard_labels = {"critical", "complex", "breaking", "architecture", "security", "performance", "refactor"}
+    has_easy = bool(set(labels) & easy_labels)
+    has_hard = bool(set(labels) & hard_labels)
+    score = 0
+    if body_len > 2000: score += 3
+    elif body_len > 500: score += 2
+    elif body_len > 100: score += 1
+    if comments_count > 10: score += 3
+    elif comments_count > 5: score += 2
+    elif comments_count > 2: score += 1
+    if has_hard: score += 3
+    if has_easy: score -= 2
+    checklist_items = body.count("- [ ]") + body.count("- [x]")
+    if checklist_items > 5: score += 2
+    elif checklist_items > 0: score += 1
+    code_blocks = body.count("```")
+    if code_blocks > 4: score += 2
+    elif code_blocks > 0: score += 1
+    score = max(1, min(score, 10))
+    if score <= 3: level = "Beginner — good for first-time contributors"
+    elif score <= 5: level = "Intermediate — some experience helpful"
+    elif score <= 7: level = "Advanced — requires deep understanding of the codebase"
+    else: level = "Expert — significant effort and expertise needed"
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "issue_number": issue_num, "title": issue.get("title", ""), "complexity_score": score, "complexity_level": level, "signals": {"body_length": body_len, "comments": comments_count, "checklist_items": checklist_items, "code_blocks_in_body": code_blocks // 2, "has_beginner_label": has_easy, "has_hard_label": has_hard, "labels": labels}, "body_preview": _truncate(body, 300)}, indent=2)
+
+
 # ========================== ENTRY POINT ==========================
 
 def main():
