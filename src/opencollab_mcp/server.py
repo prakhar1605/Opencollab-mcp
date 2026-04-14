@@ -22,7 +22,7 @@ def _days_ago(iso_str: str | None) -> int | None:
         return None
     try:
         dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
-        return (datetime.now(timezone.utc) - dt).days
+        return (datetime.now(timezone.utc) - dt).days 
     except Exception:
         return None
 
