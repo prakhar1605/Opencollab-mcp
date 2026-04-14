@@ -18,7 +18,7 @@ mcp = FastMCP("opencollab_mcp")
 
  
 def _days_ago(iso_str: str | None) -> int | None:
-    if not iso_str: 
+    if not iso_str:  
         return None
     try:
         dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
