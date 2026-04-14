@@ -11,7 +11,7 @@ from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, ConfigDict 
- 
+  
 from .github_client import github_get, github_search, handle_github_error 
  
 mcp = FastMCP("opencollab_mcp")
