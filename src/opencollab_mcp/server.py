@@ -40,7 +40,7 @@ def _recent_date_str(days_back: int = 90) -> str:
 # ========================== INPUT MODELS (all required, no defaults) ==========================
 
 class UsernameInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid") 
     username: str = Field(..., description="GitHub username", min_length=1, max_length=39)
 
 class RepoInput(BaseModel):
