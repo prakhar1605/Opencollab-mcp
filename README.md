@@ -100,7 +100,7 @@ Then use `opencollab-mcp` as the command (no `uvx` needed):
 ```
 
 ---
-
+   
 ## Example conversations
 
 ### "Match me with issues"
