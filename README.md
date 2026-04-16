@@ -28,6 +28,11 @@ Stop scrolling through random issues. Let AI analyze your GitHub profile and fin
 | `opencollab_repo_activity_pulse` | Activity pulse for last 30 days — is the repo alive or dying? |
 | `opencollab_find_mentor_repos` | Find repos with mentorship programs (GSoC, Hacktoberfest, Outreachy) |
 | `opencollab_issue_complexity` | Estimate complexity of a specific issue — beginner to expert rating |
+| `opencollab_dependency_check` | Inspect repo tech stack — what libraries and frameworks are used |
+| `opencollab_similar_repos` | Find similar repos to one you like — expand your contribution targets |
+| `opencollab_weekend_issues` | Quick issues for a weekend sprint — docs, typos, tests, 1-2 hours |
+| `opencollab_repo_languages` | Detailed language % breakdown — know what skills you need |
+| `opencollab_first_timer_score` | Rate your open source readiness — personalized tips to improve |
 
 ---
 

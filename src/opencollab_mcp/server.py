@@ -614,6 +614,220 @@ async def opencollab_issue_complexity(params: IssueInput) -> str:
     return json.dumps({"repo": f"{params.owner}/{params.repo}", "issue_number": issue_num, "title": issue.get("title", ""), "complexity_score": score, "complexity_level": level, "signals": {"body_length": body_len, "comments": comments_count, "checklist_items": checklist_items, "code_blocks_in_body": code_blocks // 2, "has_beginner_label": has_easy, "has_hard_label": has_hard, "labels": labels}, "body_preview": _truncate(body, 300)}, indent=2)
 
 
+# ========================== TOOL 18: dependency_check ==========================
+
+@mcp.tool(name="opencollab_dependency_check", annotations={"title": "Check repo tech stack and dependencies", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_dependency_check(params: RepoInput) -> str:
+    """Inspect a repo's tech stack by reading its dependency files.
+
+    Checks package.json, pyproject.toml, requirements.txt, go.mod, Cargo.toml,
+    and Gemfile to show what libraries and frameworks the project uses.
+    """
+    path = f"/repos/{params.owner}/{params.repo}"
+    dep_files = ["package.json", "pyproject.toml", "requirements.txt", "go.mod", "Cargo.toml", "Gemfile", "setup.py", "setup.cfg"]
+    found = {}
+    for df in dep_files:
+        try:
+            content = await github_get(f"{path}/contents/{df}")
+            if content.get("encoding") == "base64":
+                import base64
+                raw = base64.b64decode(content.get("content", "")).decode("utf-8", errors="replace")[:3000]
+                found[df] = raw
+        except Exception:
+            continue
+    if not found:
+        return json.dumps({"repo": f"{params.owner}/{params.repo}", "dependencies_found": False, "message": "No standard dependency files found in repo root"}, indent=2)
+    deps_summary = {}
+    for filename, raw in found.items():
+        if filename == "package.json":
+            try:
+                pkg = json.loads(raw)
+                deps_summary["npm_dependencies"] = list((pkg.get("dependencies") or {}).keys())[:20]
+                deps_summary["npm_dev_dependencies"] = list((pkg.get("devDependencies") or {}).keys())[:15]
+            except Exception:
+                deps_summary["package.json"] = "present but could not parse"
+        elif filename == "requirements.txt":
+            lines = [l.strip().split("==")[0].split(">=")[0].split("[")[0] for l in raw.splitlines() if l.strip() and not l.startswith("#")]
+            deps_summary["python_requirements"] = lines[:25]
+        elif filename == "pyproject.toml":
+            deps_summary["pyproject.toml_preview"] = raw[:500]
+        else:
+            deps_summary[f"{filename}_preview"] = raw[:400]
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "dependency_files": list(found.keys()), "parsed": deps_summary}, indent=2)
+
+
+# ========================== TOOL 19: similar_repos ==========================
+
+@mcp.tool(name="opencollab_similar_repos", annotations={"title": "Find similar repos to contribute to", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_similar_repos(params: RepoInput) -> str:
+    """Find repositories similar to a given one based on topics and language.
+
+    If you like contributing to repo X, this finds other repos in the same
+    domain that are also welcoming to contributors.
+    """
+    path = f"/repos/{params.owner}/{params.repo}"
+    try:
+        repo = await github_get(path)
+    except Exception as e:
+        return handle_github_error(e)
+    lang = repo.get("language") or ""
+    topics = repo.get("topics") or []
+    desc_words = (repo.get("description") or "").split()[:3]
+    query_parts = []
+    if topics:
+        query_parts.append(f"topic:{topics[0]}")
+    if lang:
+        query_parts.append(f"language:{lang}")
+    if desc_words:
+        query_parts.append(" ".join(desc_words))
+    query_parts.append("good-first-issues:>0")
+    query_parts.append("archived:false")
+    try:
+        result = await github_search("repositories", " ".join(query_parts), {"sort": "stars", "order": "desc", "per_page": 12})
+    except Exception as e:
+        return handle_github_error(e)
+    similar = []
+    for r in result.get("items", []):
+        if r.get("full_name") == f"{params.owner}/{params.repo}":
+            continue
+        similar.append({"name": r.get("full_name", ""), "description": _truncate(r.get("description"), 150), "stars": r.get("stargazers_count", 0), "language": r.get("language"), "topics": r.get("topics", [])[:6], "open_issues": r.get("open_issues_count", 0), "url": r.get("html_url", ""), "last_push_days_ago": _days_ago(r.get("pushed_at"))})
+    return json.dumps({"source_repo": f"{params.owner}/{params.repo}", "similar_repos": similar[:10], "count": len(similar[:10])}, indent=2)
+
+
+# ========================== TOOL 20: weekend_issues ==========================
+
+@mcp.tool(name="opencollab_weekend_issues", annotations={"title": "Find quick issues for a weekend contribution", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_weekend_issues(params: LanguageInput) -> str:
+    """Find small, quick issues perfect for a weekend or 1-2 hour contribution.
+
+    Searches for issues labelled documentation, typo, test, chore, or other
+    low-effort tags in addition to good-first-issue.
+    """
+    since = _recent_date_str(60)
+    quick_labels = ["documentation", "docs", "typo", "test", "tests", "chore", "style", "cleanup", "refactor", "translation"]
+    all_issues = []
+    seen_urls = set()
+    for label in quick_labels[:5]:
+        try:
+            result = await github_search("issues", f'language:{params.language} label:"{label}" state:open created:>{since} is:public', {"sort": "created", "order": "desc", "per_page": 5})
+            for item in result.get("items", []):
+                url = item.get("html_url", "")
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                repo_url = item.get("repository_url", "")
+                repo_name = "/".join(repo_url.split("/")[-2:]) if repo_url else ""
+                body = item.get("body") or ""
+                is_quick = len(body) < 500 and item.get("comments", 0) <= 3
+                if is_quick:
+                    all_issues.append({"title": item.get("title", ""), "url": url, "repo": repo_name, "labels": [lb.get("name", "") for lb in item.get("labels", [])], "comments": item.get("comments", 0), "body_preview": _truncate(body, 150), "estimated_effort": "1-2 hours"})
+        except Exception:
+            continue
+    all_issues.sort(key=lambda x: x.get("comments", 0))
+    return json.dumps({"language": params.language, "weekend_issues": all_issues[:12], "count": len(all_issues[:12]), "tip": "These are small issues (short description, few comments) — perfect for a quick weekend contribution"}, indent=2)
+
+
+# ========================== TOOL 21: repo_languages ==========================
+
+@mcp.tool(name="opencollab_repo_languages", annotations={"title": "Get detailed language breakdown of a repo", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_repo_languages(params: RepoInput) -> str:
+    """Get a detailed language breakdown for a repository.
+
+    Shows percentage of each programming language used in the codebase.
+    Helps you decide if you have the right skills before contributing.
+    """
+    try:
+        languages = await github_get(f"/repos/{params.owner}/{params.repo}/languages")
+    except Exception as e:
+        return handle_github_error(e)
+    total_bytes = max(sum(languages.values()), 1)
+    breakdown = [{"language": lang, "bytes": b, "percentage": round(b / total_bytes * 100, 1)} for lang, b in sorted(languages.items(), key=lambda x: x[1], reverse=True)]
+    primary = breakdown[0]["language"] if breakdown else "Unknown"
+    skills_needed = [l["language"] for l in breakdown if l["percentage"] >= 5]
+    return json.dumps({"repo": f"{params.owner}/{params.repo}", "primary_language": primary, "skills_needed": skills_needed, "total_languages": len(breakdown), "breakdown": breakdown}, indent=2)
+
+
+# ========================== TOOL 22: first_timer_score ==========================
+
+@mcp.tool(name="opencollab_first_timer_score", annotations={"title": "Rate how ready a user is for open source", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True})
+async def opencollab_first_timer_score(params: UsernameInput) -> str:
+    """Rate how ready a GitHub user is for open source contributions.
+
+    Scores profile completeness, coding activity, language diversity,
+    and gives personalized tips on what to improve before contributing.
+    """
+    try:
+        user = await github_get(f"/users/{params.username}")
+        repos_raw = await github_get(f"/users/{params.username}/repos", {"per_page": 100, "sort": "pushed", "type": "owner"})
+        events_raw = await github_get(f"/users/{params.username}/events/public", {"per_page": 30})
+    except Exception as e:
+        return handle_github_error(e)
+    score = 0
+    tips = []
+    if user.get("bio"):
+        score += 10
+    else:
+        tips.append("Add a bio to your GitHub profile — maintainers check contributor profiles")
+    if user.get("public_repos", 0) >= 5:
+        score += 15
+    elif user.get("public_repos", 0) >= 1:
+        score += 8
+        tips.append("Create more public repos to show your work")
+    else:
+        tips.append("Push at least 1-2 projects to GitHub to build credibility")
+    lang_set = set()
+    for repo in repos_raw:
+        lang = repo.get("language")
+        if lang:
+            lang_set.add(lang)
+    if len(lang_set) >= 3:
+        score += 15
+    elif len(lang_set) >= 1:
+        score += 8
+        tips.append("Try projects in more languages to expand your contribution options")
+    else:
+        tips.append("Your repos don't show any programming language — push some code")
+    has_readme_repos = sum(1 for r in repos_raw if r.get("description"))
+    if has_readme_repos >= 3:
+        score += 10
+    else:
+        tips.append("Add descriptions to your repos — shows you care about documentation")
+    recent_events = len(events_raw)
+    if recent_events >= 20:
+        score += 15
+    elif recent_events >= 5:
+        score += 8
+    else:
+        tips.append("Be more active on GitHub — push code, open issues, star repos")
+    fork_count = sum(1 for r in repos_raw if r.get("fork"))
+    if fork_count >= 2:
+        score += 10
+        tips.append("You've forked repos — great! Now open PRs on them")
+    elif fork_count >= 1:
+        score += 5
+    else:
+        tips.append("Fork a project you use and try making a small improvement")
+    stars_received = sum(r.get("stargazers_count", 0) for r in repos_raw)
+    if stars_received >= 10:
+        score += 10
+    elif stars_received >= 1:
+        score += 5
+    account_age = _days_ago(user.get("created_at"))
+    if account_age and account_age >= 365:
+        score += 5
+    has_pr_events = any(e.get("type") == "PullRequestEvent" for e in events_raw)
+    if has_pr_events:
+        score += 10
+    else:
+        tips.append("You haven't opened any PRs yet — start with a documentation fix!")
+    score = min(score, 100)
+    if score >= 80: level = "Ready — you can confidently contribute to most projects"
+    elif score >= 60: level = "Almost there — a few improvements and you're set"
+    elif score >= 40: level = "Getting started — build up your profile first"
+    else: level = "Beginner — focus on learning and building projects before contributing"
+    return json.dumps({"username": params.username, "readiness_score": score, "readiness_level": level, "languages_known": sorted(lang_set), "public_repos": user.get("public_repos", 0), "account_age_days": account_age, "has_opened_prs": has_pr_events, "tips_to_improve": tips}, indent=2)
+
+
 # ========================== ENTRY POINT ==========================
 
 def main():
