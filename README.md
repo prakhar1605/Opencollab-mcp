@@ -2,68 +2,71 @@
 
 # 🚀 OpenCollab MCP
 
-### The AI-powered open source contribution matchmaker
+### Land your first open source PR this weekend.
 
-**22 tools** · **Zero AI costs** · **Works with Claude Desktop, Cursor, VS Code**
+*Stop scrolling GitHub. Let AI find you a mergeable issue in 30 seconds — matched to your actual skills, in a repo that's actually alive.*
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![PyPI version](https://img.shields.io/pypi/v/opencollab-mcp.svg?color=blue)](https://pypi.org/project/opencollab-mcp/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://modelcontextprotocol.io)
 
-*Stop scrolling through random GitHub issues. Let AI analyze your profile and find contributions you're actually qualified for, in repos that are actually maintained.*
+**Works with Claude Desktop · Cursor · VS Code · any MCP client**
 
-[Quick Start](#-quick-start) · [All 22 Tools](#-all-22-tools) · [Examples](#-see-it-in-action) · [Contributing](#-contributing)
+[Install in 60 seconds](#-install-in-60-seconds) · [See it in action](#-see-it-in-action) · [All 22 tools](#-all-22-tools)
 
 </div>
 
 ---
 
-## 🤔 The Problem
+## The problem
 
 You want to contribute to open source. So you:
 
-1. ~~Scroll through hundreds of GitHub repos~~ 😩
-2. ~~Find a "good first issue" that's already taken~~ 😤
-3. ~~Spend hours understanding a dead repo~~ 💀
-4. ~~Discover someone already submitted a PR~~ 😭
-5. ~~Give up and go back to tutorials~~ 📺
+1. Scroll through hundreds of GitHub repos 😩
+2. Find a "good first issue" — already taken 😤
+3. Spend an hour understanding a dead repo 💀
+4. Discover someone already opened a PR 😭
+5. Give up, go back to tutorials 📺
 
-**This is broken.** We built OpenCollab to fix it.
+**This loop is broken.** OpenCollab fixes it in one sentence to your AI assistant.
 
-## ✨ The Solution
-
-OpenCollab MCP gives your AI assistant **22 specialized tools** to find, evaluate, and plan open source contributions — matched to YOUR actual skills.
+## The fix
 
 ```
-"Analyze my GitHub profile and find me issues I can work on this weekend"
+"Find me a good first issue I can contribute to this weekend."
 ```
 
-That's it. One sentence. Claude does the rest.
+Claude calls OpenCollab → scans your GitHub profile → picks your strongest language → finds beginner-friendly issues in *active* repos with *no existing PR* → hands you the issue + full context to draft the fix.
+
+One sentence. 30 seconds. A real mergeable issue.
 
 ---
 
-## 📦 Quick Start
+## 📦 Install in 60 seconds
 
-### 1. Get a GitHub token (free, 30 seconds)
+### 1. Get a free GitHub token
 
-Go to [github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)** → select `public_repo` scope → copy it.
+[github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)** → check `public_repo` → copy.
 
 ### 2. Add to your AI tool
 
-<details>
+<details open>
 <summary><b>🖥️ Claude Desktop</b> (recommended)</summary>
 
-Add to your config file:
+Edit your config file:
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add this:
 
 ```json
 {
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/prakhar1605/Opencollab-mcp.git", "opencollab-mcp"],
+      "args": ["opencollab-mcp"],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
@@ -72,21 +75,21 @@ Add to your config file:
 }
 ```
 
-Restart Claude Desktop. Done!
+Restart Claude Desktop. Done.
 
 </details>
 
 <details>
 <summary><b>⚡ Cursor / VS Code</b></summary>
 
-Add to `.cursor/mcp.json` or VS Code MCP config:
+Add to `.cursor/mcp.json` or your VS Code MCP config:
 
 ```json
 {
   "mcpServers": {
     "opencollab": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/prakhar1605/Opencollab-mcp.git", "opencollab-mcp"],
+      "args": ["opencollab-mcp"],
       "env": {
         "GITHUB_TOKEN": "your_github_token_here"
       }
@@ -98,13 +101,13 @@ Add to `.cursor/mcp.json` or VS Code MCP config:
 </details>
 
 <details>
-<summary><b>📦 Install with pip</b></summary>
+<summary><b>🐍 Install with pip</b></summary>
 
 ```bash
-pip install git+https://github.com/prakhar1605/Opencollab-mcp.git
+pip install opencollab-mcp
 ```
 
-Then use in your MCP config:
+Then in your MCP config:
 
 ```json
 {
@@ -123,205 +126,148 @@ Then use in your MCP config:
 
 ---
 
-## 🛠️ All 22 Tools
+## 🎬 See it in action
 
-### 🔍 Discovery & Matching
+### The killer demo — 3 prompts to go from zero to a drafted PR
 
-| Tool | What it does |
+**1️⃣ Analyze me**
+> *"My GitHub username is `prakhar1605`. Am I ready to contribute to open source?"*
+>
+> Readiness: **72/100**. You know 4 languages, 15 public repos, haven't opened PRs yet. Tips: start with a docs fix, try a repo you already use.
+
+**2️⃣ Find me a mergeable issue**
+> *"Find me a Python good-first-issue I can finish in 1–2 hours. Make sure nobody's working on it."*
+>
+> Returns 5 issues · filters out ones with assignees or linked PRs · sorts by "quickness score" (short body, few comments, easy label).
+
+**3️⃣ Plan the PR**
+> *"Plan a PR for issue #456 in `owner/repo`."*
+>
+> Pulls the issue body, comments, CONTRIBUTING.md, the repo's directory structure, and the default branch — hands Claude everything needed to draft the actual code.
+
+That's the whole loop: **Analyze → Find → Plan → Ship.**
+
+### More things you can just *say*
+
+| You say… | What happens |
 |---|---|
-| `opencollab_match_me` | **All-in-one** — analyzes your profile + finds matched issues in one step |
-| `opencollab_find_issues` | Finds "good first issue" / "help wanted" issues for any language |
-| `opencollab_trending_repos` | Trending repos actively seeking contributors, sorted by stars |
-| `opencollab_similar_repos` | Find repos similar to one you already like |
-| `opencollab_find_mentor_repos` | Repos with GSoC, Hacktoberfest, Outreachy mentorship programs |
-| `opencollab_weekend_issues` | Quick 1-2 hour issues — docs, typos, tests, perfect for a weekend sprint |
-
-### 📊 Evaluation & Scoring
-
-| Tool | What it does |
-|---|---|
-| `opencollab_repo_health` | Health score (0-100) — is this repo actually worth contributing to? |
-| `opencollab_contribution_readiness` | Setup difficulty check — Dockerfile, CI, docs, templates |
-| `opencollab_impact_estimator` | Contribution impact tier (MASSIVE/HIGH/MEDIUM/LOW) + resume line |
-| `opencollab_repo_activity_pulse` | 30-day activity pulse — is the project growing, stable, or dying? |
-| `opencollab_compare_repos` | Side-by-side comparison of two repos with a recommendation |
-| `opencollab_repo_languages` | Detailed language % breakdown — know what skills you need |
-| `opencollab_dependency_check` | Inspect tech stack — what libraries and frameworks the project uses |
-
-### 👤 Profile & Readiness
-
-| Tool | What it does |
-|---|---|
-| `opencollab_analyze_profile` | Deep analysis of your GitHub skills, languages, activity patterns |
-| `opencollab_first_timer_score` | Open source readiness score (0-100) + personalized tips to improve |
-| `opencollab_contributor_leaderboard` | Top contributors of any repo with commit counts and profiles |
-
-### 🎯 Issue Intelligence
-
-| Tool | What it does |
-|---|---|
-| `opencollab_check_issue_availability` | Is this issue still free? Checks assignees + linked PRs |
-| `opencollab_issue_complexity` | Difficulty score (1-10) — beginner, intermediate, advanced, or expert |
-| `opencollab_stale_issue_finder` | Old unclaimed issues nobody is working on — hidden easy wins |
-| `opencollab_label_explorer` | All labels in a repo + which ones are beginner-friendly |
-| `opencollab_recent_prs` | Recently merged PRs — see what contributions actually get accepted |
-| `opencollab_generate_pr_plan` | Full issue context + contributing guide + directory structure for PR planning |
+| *"Is issue #123 in facebook/react still available?"* | ✅ No assignees, no open PRs. 3 comments, 12 days old. Go for it. |
+| *"Compare langchain vs llama_index for contributing."* | Side-by-side: stars, PR merge rate, activity. Recommends winner. |
+| *"Is tensorflow/tensorflow alive?"* | 847 commits in last 30 days. Growing +23%. Safe to invest time. |
+| *"How complex is issue #5432 in pytorch?"* | 7/10 · Advanced. 12 comments, architecture label. Skip unless you know the codebase. |
+| *"Find Python repos with GSoC or Hacktoberfest."* | Mentored repos sorted by mentor signals. |
+| *"What dependencies does fastapi use?"* | Reads pyproject.toml → starlette, pydantic, uvicorn. |
+| *"What's the impact of contributing to react?"* | 🎯 MASSIVE · 230k+ stars · Resume line: "Contributed to a project used by millions of devs." |
 
 ---
 
-## 💬 See It In Action
+## 🛠️ All 22 tools
 
-### 🎯 "Match me with issues"
+<details>
+<summary><b>🔍 Discovery & Matching (6)</b></summary>
 
-> **You:** My GitHub username is prakhar1605. Find me open source issues I can contribute to.
->
-> **Claude:** *analyzes profile → detects Python as top language → returns 10 matching good-first-issues instantly*
+| Tool | Does |
+|---|---|
+| `opencollab_match_me` | **All-in-one** — profile analysis + matched issues |
+| `opencollab_find_issues` | Good-first-issues for any language |
+| `opencollab_trending_repos` | Trending repos seeking contributors |
+| `opencollab_similar_repos` | Find repos like one you already like |
+| `opencollab_find_mentor_repos` | GSoC · Hacktoberfest · Outreachy repos |
+| `opencollab_weekend_issues` | 1–2 hour issues — docs, typos, tests |
 
-### 📊 "Rate my open source readiness"
+</details>
 
-> **You:** How ready am I for open source? Username: prakhar1605
->
-> **Claude:** Readiness: 72/100. You know 4 languages, have 15 repos, but haven't opened PRs yet. Tips: Start with a docs fix, fork a project you use daily...
+<details>
+<summary><b>📊 Evaluation & Scoring (7)</b></summary>
 
-### ⚖️ "Help me choose between two repos"
+| Tool | Does |
+|---|---|
+| `opencollab_repo_health` | Health score 0–100 |
+| `opencollab_contribution_readiness` | Setup difficulty (Dockerfile, CI, docs) |
+| `opencollab_impact_estimator` | Impact tier + resume line |
+| `opencollab_repo_activity_pulse` | 30-day momentum — growing? dying? |
+| `opencollab_compare_repos` | Two repos side-by-side + winner |
+| `opencollab_repo_languages` | Language % breakdown |
+| `opencollab_dependency_check` | Tech stack — what libs the project uses |
 
-> **You:** Compare langchain-ai/langchain vs run-llama/llama_index for contributing.
->
-> **Claude:** *fetches both → compares stars, PR merge rate, activity → recommends langchain (85% merge rate, pushed 2 days ago)*
+</details>
 
-### 🔓 "Is this issue available?"
+<details>
+<summary><b>👤 Profile & Readiness (3)</b></summary>
 
-> **You:** Check if issue #456 in facebook/react is still free to work on.
->
-> **Claude:** ✅ Available! No assignees, no open PRs. 3 comments, created 12 days ago. Go for it!
+| Tool | Does |
+|---|---|
+| `opencollab_analyze_profile` | Deep profile analysis |
+| `opencollab_first_timer_score` | Open source readiness 0–100 + tips |
+| `opencollab_contributor_leaderboard` | Top contributors of any repo |
 
-### 🏃 "Weekend sprint"
+</details>
 
-> **You:** Find me quick Python issues I can knock out in 1-2 hours this weekend.
->
-> **Claude:** *finds docs fixes, typo corrections, test additions — all with short descriptions and few comments*
+<details>
+<summary><b>🎯 Issue Intelligence (6)</b></summary>
 
-### 🔬 "How hard is this issue?"
+| Tool | Does |
+|---|---|
+| `opencollab_check_issue_availability` | Is this issue still free? |
+| `opencollab_issue_complexity` | Difficulty 1–10 |
+| `opencollab_stale_issue_finder` | Old unclaimed issues — hidden wins |
+| `opencollab_label_explorer` | All labels + beginner-friendly ones |
+| `opencollab_recent_prs` | Recently merged PRs — what gets accepted |
+| `opencollab_generate_pr_plan` | Full context for PR planning |
 
-> **You:** How complex is issue #5432 in pytorch/pytorch?
->
-> **Claude:** Complexity: 7/10 (Advanced). 2000+ char body, 12 comments, architecture label. Needs deep codebase knowledge.
-
-### 🧭 "Find me a mentored project"
-
-> **You:** Find Python repos with GSoC or Hacktoberfest programs.
->
-> **Claude:** *finds repos tagged gsoc, hacktoberfest, mentorship — sorted by mentor signals*
-
-### 🏗️ "Plan my PR"
-
-> **You:** I want to work on issue #123 in org/repo. Help me plan a PR.
->
-> **Claude:** *fetches issue body, all comments, contributing guide, repo directory → generates step-by-step implementation plan*
-
-### 📈 "Is this repo alive?"
-
-> **You:** What's the activity pulse of tensorflow/tensorflow?
->
-> **Claude:** 847 commits in last 30 days. Momentum: Growing (+23%). Very active — safe to invest time.
-
-### 🔍 "What tech stack is this?"
-
-> **You:** What dependencies does fastapi/fastapi use?
->
-> **Claude:** *reads pyproject.toml → lists starlette, pydantic, uvicorn with versions*
-
-### 🏆 "Who contributes the most?"
-
-> **You:** Show me the top contributors of microsoft/vscode.
->
-> **Claude:** *leaderboard with ranks, commit counts, and profile links*
-
-### 🗺️ "Find similar repos"
-
-> **You:** I like contributing to fastapi/fastapi. Find me similar repos.
->
-> **Claude:** *finds 10 similar web framework repos with good-first-issues — starlette, litestar, sanic...*
-
-### 📋 "What labels should I look for?"
-
-> **You:** Show me all labels in fastapi/fastapi and which are beginner-friendly.
->
-> **Claude:** *lists 35 labels → highlights 'good first issue', 'help wanted', 'docs' as beginner-friendly*
-
-### 💪 "What's the impact?"
-
-> **You:** How impactful would it be to contribute to facebook/react?
->
-> **Claude:** Impact: MASSIVE. 230k+ stars. Resume line: "Contributed to a project used by millions of developers"
-
-### 📐 "What languages do I need?"
-
-> **You:** What languages are used in kubernetes/kubernetes?
->
-> **Claude:** Go: 87.3%, Shell: 5.2%, Python: 3.1%... You'll primarily need Go.
+</details>
 
 ---
 
-## ⚡ How It Works
+## ⚡ Why it's different
 
 ```
-You ask Claude → Claude calls OpenCollab tools → Tools fetch GitHub API → Data returns → Claude gives smart recommendations
+You ask Claude → Claude calls OpenCollab tools → Tools hit GitHub's free API → Data flows back → Claude reasons over it → You get a real, specific answer
 ```
 
-OpenCollab is a **data bridge**, not an AI. It fetches and structures data from GitHub's free API. Your AI assistant (Claude, Cursor, etc.) does all the intelligent analysis. This means:
+OpenCollab is a **data bridge**, not an AI. Your AI assistant does the thinking. That means:
 
-- **🆓 Zero AI costs** — uses GitHub's free API, no paid services
-- **🔑 No API keys** besides a free GitHub token
-- **💻 Works locally** — STDIO transport, runs on your machine
-- **🔒 Private** — your data never leaves your computer
-- **⚡ Fast** — direct GitHub API calls, no middleware
+- 🆓 **Zero AI costs** — pure GitHub API, no paid services
+- 🔑 **No secrets besides a free GitHub token**
+- 💻 **Runs locally** on your machine (STDIO transport)
+- 🔒 **Private** — your GitHub data never leaves your computer
+- ⚡ **Fast** — direct API calls, no middleware, no telemetry
 
 ---
 
-## 🏗️ Development
+## 🏗️ Develop / Contribute
+
+This project is itself a great first contribution target.
 
 ```bash
-# Clone
 git clone https://github.com/prakhar1605/Opencollab-mcp.git
 cd Opencollab-mcp
-
-# Install in dev mode
 pip install -e .
-
-# Set your token
 export GITHUB_TOKEN="your_token_here"
-
-# Run directly
 python -m opencollab_mcp.server
 
-# Test with MCP Inspector
+# Or test with the MCP Inspector:
 npx @modelcontextprotocol/inspector python -m opencollab_mcp.server
 ```
+
+Check [open issues](https://github.com/prakhar1605/Opencollab-mcp/issues) labelled `good first issue`.
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] 22 tools for contribution discovery, evaluation, and planning
-- [x] Profile analysis and skill matching
-- [x] Issue complexity and availability checking
-- [x] Repo comparison and health scoring
-- [x] Tech stack and dependency inspection
-- [x] Mentorship program discovery (GSoC, Hacktoberfest, Outreachy)
-- [ ] PyPI package (`uvx opencollab-mcp` without git URL)
-- [ ] Caching layer for faster responses
-- [ ] GitHub Actions CI/CD pipeline
-- [ ] SSE remote deployment support
-- [ ] Contribution tracking over time
+- [x] 22 tools shipped
+- [x] **Published on PyPI — `uvx opencollab-mcp` works out of the box**
+- [ ] In-memory caching layer (fewer API calls, less rate-limit friction)
+- [ ] `first_pr_generator` — one-shot "find + plan + draft my first PR"
+- [ ] `track_my_prs` — dashboard of your open PRs with staleness nudges
+- [ ] `skill_gap` — compare your skills vs a target repo's stack
+- [ ] GitHub Actions CI
+- [ ] SSE/remote deployment
+
+Got an idea? [Open an issue](https://github.com/prakhar1605/Opencollab-mcp/issues/new) — that's the fastest path in.
 
 ---
-
-## 🤝 Contributing
-
-Contributions welcome! This project is itself a great first contribution target.
-
-Check the [issues tab](https://github.com/prakhar1605/Opencollab-mcp/issues) for tasks labeled `good first issue`.
 
 ## 📄 License
 
@@ -331,8 +277,11 @@ MIT — see [LICENSE](LICENSE).
 
 <div align="center">
 
-**Built with ❤️ by [Prakhar Pandey](https://github.com/prakhar1605)** — IIT Guwahati
+**Built with ❤️ by [Prakhar Pandey](https://github.com/prakhar1605)** · IIT Guwahati
 
-⭐ *If this helped you find your first open source contribution, give it a star!* ⭐
+⭐ **Star this repo if OpenCollab helps you land a PR.** ⭐  
+*It's the single biggest thing you can do to help other devs discover it.*
+
+[Install now](#-install-in-60-seconds) · [Report a bug](https://github.com/prakhar1605/Opencollab-mcp/issues) · [Share on Twitter](https://twitter.com/intent/tweet?text=Just%20found%20OpenCollab%20MCP%20%E2%80%94%20it%20finds%20me%20mergeable%20open%20source%20issues%20in%2030%20seconds.%20Works%20with%20Claude%20Desktop%2C%20Cursor%2C%20VS%20Code.%20pip%20install%20opencollab-mcp&url=https://github.com/prakhar1605/Opencollab-mcp)
 
 </div>
