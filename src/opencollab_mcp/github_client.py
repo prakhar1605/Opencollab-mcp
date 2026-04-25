@@ -1,99 +1,124 @@
 """GitHub API client for OpenCollab MCP.
 
-Uses a module-level httpx.AsyncClient (connection reuse) and a TTL cache
-to reduce duplicate calls across chained tools.
+Wraps httpx with:
+- Authenticated headers
+- Friendly error mapping
+- A tiny in-memory TTL cache to soften GitHub rate-limit pressure for
+  repeat lookups inside a single conversation.
 """
+
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
+import time
 from typing import Any, Optional
 
 import httpx
-from cachetools import TTLCache
 
-logger = logging.getLogger(__name__)
+from .constants import (
+    GITHUB_API_BASE,
+    DEFAULT_TIMEOUT,
+    USER_AGENT,
+    GITHUB_API_VERSION,
+    CACHE_TTL_SECONDS,
+    CACHE_MAX_ENTRIES,
+)
 
-GITHUB_API_BASE = "https://api.github.com"
-DEFAULT_TIMEOUT = 30.0
-USER_AGENT = "opencollab-mcp/0.5.0"
-
-# 5 min TTL, max 500 entries — good balance for chained tool calls
-_cache: TTLCache = TTLCache(maxsize=500, ttl=300)
-_client: Optional[httpx.AsyncClient] = None
-_client_lock = asyncio.Lock()
-
-
-async def _get_client() -> httpx.AsyncClient:
-    """Return the shared httpx.AsyncClient, creating it if needed."""
-    global _client
-    if _client is None:
-        async with _client_lock:
-            if _client is None:  # double-checked locking
-                _client = httpx.AsyncClient(
-                    timeout=DEFAULT_TIMEOUT,
-                    http2=False,  # set True once h2 is a dep
-                    headers={"User-Agent": USER_AGENT},
-                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-                )
-    return _client
+logger = logging.getLogger("opencollab_mcp.github")
 
 
-async def aclose() -> None:
-    """Close the shared client. Called at shutdown."""
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+# ---- in-memory TTL cache --------------------------------------------------
+
+_cache: dict[str, tuple[float, Any]] = {}
 
 
-def _auth_headers() -> dict[str, str]:
+def _cache_key(path: str, params: Optional[dict[str, Any]]) -> str:
+    if not params:
+        return path
+    items = sorted((k, str(v)) for k, v in params.items())
+    return f"{path}?{items}"
+
+
+def _cache_get(key: str) -> Any | None:
+    entry = _cache.get(key)
+    if not entry:
+        return None
+    expires_at, value = entry
+    if time.monotonic() > expires_at:
+        _cache.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value: Any) -> None:
+    if len(_cache) >= CACHE_MAX_ENTRIES:
+        # Cheap eviction: drop oldest entry by expiry time.
+        oldest = min(_cache.items(), key=lambda kv: kv[1][0])[0]
+        _cache.pop(oldest, None)
+    _cache[key] = (time.monotonic() + CACHE_TTL_SECONDS, value)
+
+
+def clear_cache() -> None:
+    """Useful for tests."""
+    _cache.clear()
+
+
+# ---- HTTP -----------------------------------------------------------------
+
+def _get_headers() -> dict[str, str]:
+    """Build auth headers from environment."""
     token = os.environ.get("GITHUB_TOKEN", "")
     headers = {
         "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
+        "User-Agent": USER_AGENT,
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
-def _cache_key(path: str, params: Optional[dict[str, Any]]) -> tuple:
-    items = tuple(sorted((params or {}).items()))
-    return (path, items)
-
-
 async def github_get(
     path: str,
     params: Optional[dict[str, Any]] = None,
+    *,
     use_cache: bool = True,
 ) -> Any:
-    """Authenticated GET with TTL caching and one retry on 5xx."""
+    """Make an authenticated GET request to GitHub API.
+
+    Returns parsed JSON. For HTTP 202 (stats still computing) returns an
+    empty dict so callers can detect 'not ready yet' without a crash.
+    """
     key = _cache_key(path, params)
-    if use_cache and key in _cache:
-        logger.debug("cache hit: %s", path)
-        return _cache[key]
+    if use_cache:
+        cached = _cache_get(key)
+        if cached is not None:
+            return cached
 
-    client = await _get_client()
-    url = f"{GITHUB_API_BASE}{path}"
+    async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+        resp = await client.get(
+            f"{GITHUB_API_BASE}{path}",
+            headers=_get_headers(),
+            params=params or {},
+        )
 
-    for attempt in range(2):
+        # GitHub returns 202 with empty body while it computes statistics
+        # (commit_activity, participation, contributors on cold repos).
+        if resp.status_code == 202:
+            logger.info("GitHub returned 202 (stats computing) for %s", path)
+            return {}
+
+        resp.raise_for_status()
         try:
-            resp = await client.get(url, headers=_auth_headers(), params=params or {})
-            # GitHub stats endpoints return 202 while computing
-            if resp.status_code == 202:
-                raise StatsComputingError(path)
-            resp.raise_for_status()
             data = resp.json()
-            if use_cache:
-                _cache[key] = data
-            return data
-        except httpx.HTTPStatusError as e:
-            if 500 <= e.response.status_code < 600 and attempt == 0:
-                await asyncio.sleep(1.0)
-                continue
-            raise
+        except ValueError:
+            logger.warning("Non-JSON response from %s", path)
+            return {}
+
+    if use_cache:
+        _cache_set(key, data)
+    return data
 
 
 async def github_search(
@@ -101,39 +126,31 @@ async def github_search(
     query: str,
     params: Optional[dict[str, Any]] = None,
 ) -> Any:
-    """Search GitHub (issues, repositories, etc.)."""
+    """Search GitHub (issues, repos, etc.)."""
     merged = {"q": query, "per_page": 30, **(params or {})}
     return await github_get(f"/search/{endpoint}", merged)
 
 
-class StatsComputingError(Exception):
-    """GitHub is still computing stats for this repo (202 response)."""
-    def __init__(self, path: str):
-        super().__init__(f"GitHub is computing stats for {path}. Try again in ~5 seconds.")
-
-
 def handle_github_error(e: Exception) -> str:
-    """Human-friendly error string for GitHub API failures."""
-    if isinstance(e, StatsComputingError):
-        return f"Info: {e}"
+    """Return a human-friendly error string for GitHub API failures.
+
+    Always logs full traceback so production deployments can diagnose,
+    while users see something concise and actionable.
+    """
+    logger.exception("GitHub API error: %s", e)
+
     if isinstance(e, httpx.HTTPStatusError):
         code = e.response.status_code
         if code == 401:
-            return "Error: GitHub authentication failed. Check your GITHUB_TOKEN."
+            return ("Error: GitHub authentication failed. "
+                    "Check your GITHUB_TOKEN environment variable.")
         if code == 403:
             remaining = e.response.headers.get("x-ratelimit-remaining", "?")
-            reset = e.response.headers.get("x-ratelimit-reset", "")
-            reset_msg = ""
-            if reset:
-                try:
-                    from datetime import datetime, timezone
-                    dt = datetime.fromtimestamp(int(reset), tz=timezone.utc)
-                    reset_msg = f" Resets at {dt.isoformat()}."
-                except Exception:
-                    pass
-            return f"Error: GitHub rate limit or permission issue (remaining: {remaining}).{reset_msg}"
+            return (f"Error: GitHub API rate limit or permission issue "
+                    f"(remaining: {remaining}). Try again later or use a "
+                    f"token with more scopes.")
         if code == 404:
-            return "Error: Not found on GitHub. Double-check the username or repo name."
+            return "Error: Resource not found on GitHub. Double-check the username or repo name."
         if code == 422:
             return f"Error: GitHub rejected the request — {e.response.text[:200]}"
         return f"Error: GitHub API returned status {code}."

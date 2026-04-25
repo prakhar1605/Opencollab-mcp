@@ -1,2 +1,7 @@
-"""OpenCollab MCP — open source contribution matchmaker for Claude."""
+"""OpenCollab MCP — AI-powered open source contribution matchmaker."""
+
 __version__ = "0.5.0"
+
+from .server import build_server, main, mcp
+
+__all__ = ["build_server", "main", "mcp", "__version__"]
