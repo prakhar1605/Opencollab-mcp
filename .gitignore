@@ -5,7 +5,24 @@ __pycache__/
 dist/
 build/
 .env
+.env.local
 .venv/
+venv/
 *.egg
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

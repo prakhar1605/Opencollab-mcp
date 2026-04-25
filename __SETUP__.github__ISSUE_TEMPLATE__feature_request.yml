@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a new tool, mode, or capability
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Start with the user need, not the implementation
+      placeholder: |
+        When I'm looking for issues, I can't tell which repos have responsive maintainers...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: |
+        Add a new field to opencollab_repo_health that...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Suggested scope
+      description: Per CONTRIBUTING.md — we prefer enriching existing tools over adding new ones
+      options:
+        - New field on existing tool
+        - New mode on existing tool
+        - New tool (justify why it can't be a mode/field)
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

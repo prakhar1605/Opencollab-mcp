@@ -1,5 +1,5 @@
-"""Allow running as: python -m opencollab_mcp"""
-from opencollab_mcp.server import main
+"""Entry point for `python -m opencollab_mcp`."""
+from .server import main
 
-main()
- 
+if __name__ == "__main__":
+    main()

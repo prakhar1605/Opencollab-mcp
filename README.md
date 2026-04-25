@@ -2,286 +2,149 @@
 
 # 🚀 OpenCollab MCP
 
-### Land your first open source PR this weekend.
+**Land your first merged PR this weekend — with Claude's help.**
 
-*Stop scrolling GitHub. Let AI find you a mergeable issue in 30 seconds — matched to your actual skills, in a repo that's actually alive.*
+An MCP server that turns Claude into your open source mentor.
+Profile → matched issues → PR plan, in one prompt.
 
-[![PyPI version](https://img.shields.io/pypi/v/opencollab-mcp.svg?color=blue)](https://pypi.org/project/opencollab-mcp/)
+[![PyPI version](https://img.shields.io/pypi/v/opencollab-mcp.svg)](https://pypi.org/project/opencollab-mcp/)
+[![CI](https://github.com/prakhar1605/Opencollab-mcp/workflows/CI/badge.svg)](https://github.com/prakhar1605/Opencollab-mcp/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://modelcontextprotocol.io)
-
-**Works with Claude Desktop · Cursor · VS Code · any MCP client**
-
-[Install in 60 seconds](#-install-in-60-seconds) · [See it in action](#-see-it-in-action) · [All 22 tools](#-all-22-tools)
 
 </div>
 
 ---
 
-## The problem
-
-You want to contribute to open source. So you:
-
-1. Scroll through hundreds of GitHub repos 😩
-2. Find a "good first issue" — already taken 😤
-3. Spend an hour understanding a dead repo 💀
-4. Discover someone already opened a PR 😭
-5. Give up, go back to tutorials 📺
-
-**This loop is broken.** OpenCollab fixes it in one sentence to your AI assistant.
-
-## The fix
-
-```
-"Find me a good first issue I can contribute to this weekend."
-```
-
-Claude calls OpenCollab → scans your GitHub profile → picks your strongest language → finds beginner-friendly issues in *active* repos with *no existing PR* → hands you the issue + full context to draft the fix.
-
-One sentence. 30 seconds. A real mergeable issue.
+> **Demo coming soon** — a 90-second screen recording of OpenCollab finding,
+> evaluating, and planning a PR for a real GitHub issue. Drop in here once recorded.
 
 ---
 
-## 📦 Install in 60 seconds
+## Why this exists
 
-### 1. Get a free GitHub token
+Finding your first open source PR is brutal. You have to:
 
-[github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)** → check `public_repo` → copy.
+1. Pick a repo where maintainers actually merge community PRs
+2. Find an issue that's still open, unclaimed, and small enough to ship
+3. Read CONTRIBUTING.md, figure out the codebase, plan the change
 
-### 2. Add to your AI tool
+OpenCollab does all three in one prompt. You ask Claude *"find me a Python
+issue I can ship this weekend"*, and OpenCollab analyzes your GitHub profile,
+matches your skills to active repos with healthy contributor cultures,
+checks each issue for availability, scores complexity, and hands Claude
+everything it needs to draft the PR.
 
-<details open>
-<summary><b>🖥️ Claude Desktop</b> (recommended)</summary>
+## Quickstart (60 seconds)
 
-Edit your config file:
-
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
-Add this:
-
-```json
-{
-  "mcpServers": {
-    "opencollab": {
-      "command": "uvx",
-      "args": ["opencollab-mcp"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
-    }
-  }
-}
-```
-
-Restart Claude Desktop. Done.
-
-</details>
-
-<details>
-<summary><b>⚡ Cursor / VS Code</b></summary>
-
-Add to `.cursor/mcp.json` or your VS Code MCP config:
-
-```json
-{
-  "mcpServers": {
-    "opencollab": {
-      "command": "uvx",
-      "args": ["opencollab-mcp"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><b>🐍 Install with pip</b></summary>
-
+**1. Install:**
 ```bash
 pip install opencollab-mcp
 ```
 
-Then in your MCP config:
+**2. Get a GitHub token** ([generate one](https://github.com/settings/tokens),
+`public_repo` scope is enough).
 
+**3. Add to Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
     "opencollab": {
-      "command": "opencollab-mcp",
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
+      "command": "python",
+      "args": ["-m", "opencollab_mcp"],
+      "env": { "GITHUB_TOKEN": "ghp_your_token_here" }
     }
   }
 }
 ```
 
-</details>
+**4. Restart Claude Desktop and ask:**
+> *"Use OpenCollab to find me a Python good-first-issue I can finish this weekend, then plan the PR for it."*
 
----
+Done. You should see Claude call `opencollab_match_me` → `opencollab_check_issue` → `opencollab_plan_pr` and produce a step-by-step plan for an actual open issue.
 
-## 🎬 See it in action
+## The 8 tools
 
-### The killer demo — 3 prompts to go from zero to a drafted PR
+OpenCollab is **8 well-designed tools, not 22 narrow ones**. Each tool
+returns rich, composable JSON so Claude can chain them naturally.
 
-**1️⃣ Analyze me**
-> *"My GitHub username is `prakhar1605`. Am I ready to contribute to open source?"*
->
-> Readiness: **72/100**. You know 4 languages, 15 public repos, haven't opened PRs yet. Tips: start with a docs fix, try a repo you already use.
-
-**2️⃣ Find me a mergeable issue**
-> *"Find me a Python good-first-issue I can finish in 1–2 hours. Make sure nobody's working on it."*
->
-> Returns 5 issues · filters out ones with assignees or linked PRs · sorts by "quickness score" (short body, few comments, easy label).
-
-**3️⃣ Plan the PR**
-> *"Plan a PR for issue #456 in `owner/repo`."*
->
-> Pulls the issue body, comments, CONTRIBUTING.md, the repo's directory structure, and the default branch — hands Claude everything needed to draft the actual code.
-
-That's the whole loop: **Analyze → Find → Plan → Ship.**
-
-### More things you can just *say*
-
-| You say… | What happens |
-|---|---|
-| *"Is issue #123 in facebook/react still available?"* | ✅ No assignees, no open PRs. 3 comments, 12 days old. Go for it. |
-| *"Compare langchain vs llama_index for contributing."* | Side-by-side: stars, PR merge rate, activity. Recommends winner. |
-| *"Is tensorflow/tensorflow alive?"* | 847 commits in last 30 days. Growing +23%. Safe to invest time. |
-| *"How complex is issue #5432 in pytorch?"* | 7/10 · Advanced. 12 comments, architecture label. Skip unless you know the codebase. |
-| *"Find Python repos with GSoC or Hacktoberfest."* | Mentored repos sorted by mentor signals. |
-| *"What dependencies does fastapi use?"* | Reads pyproject.toml → starlette, pydantic, uvicorn. |
-| *"What's the impact of contributing to react?"* | 🎯 MASSIVE · 230k+ stars · Resume line: "Contributed to a project used by millions of devs." |
-
----
-
-## 🛠️ All 22 tools
+| Tool | What it does | Use when |
+|---|---|---|
+| `opencollab_match_me` | Profile → top languages → matched issues + readiness signals | The default entry point |
+| `opencollab_repo_health` | Health score + 30-day momentum + impact tier + deps + languages | Evaluating a repo |
+| `opencollab_check_issue` | Availability (assignees, linked PRs) + complexity rating | Before picking an issue |
+| `opencollab_plan_pr` | Issue + comments + CONTRIBUTING + repo structure | Drafting the actual PR |
+| `opencollab_find_opportunities` | Search with `mode`: `good_first_issue` / `weekend` / `trending` / `similar` / `mentor` / `stale` | Hunting for issues/repos |
+| `opencollab_compare_repos` | Side-by-side: stars, merge rate, momentum, recommendation | Choosing between two repos |
+| `opencollab_explore_repo` | Labels + top contributors + recent merged PRs | Deep dive on a repo's culture |
+| `opencollab_first_timer_score` | 0–100 readiness rating + personalized tips | Self-assessment for newcomers |
 
 <details>
-<summary><b>🔍 Discovery & Matching (6)</b></summary>
-
-| Tool | Does |
-|---|---|
-| `opencollab_match_me` | **All-in-one** — profile analysis + matched issues |
-| `opencollab_find_issues` | Good-first-issues for any language |
-| `opencollab_trending_repos` | Trending repos seeking contributors |
-| `opencollab_similar_repos` | Find repos like one you already like |
-| `opencollab_find_mentor_repos` | GSoC · Hacktoberfest · Outreachy repos |
-| `opencollab_weekend_issues` | 1–2 hour issues — docs, typos, tests |
-
-</details>
-
-<details>
-<summary><b>📊 Evaluation & Scoring (7)</b></summary>
-
-| Tool | Does |
-|---|---|
-| `opencollab_repo_health` | Health score 0–100 |
-| `opencollab_contribution_readiness` | Setup difficulty (Dockerfile, CI, docs) |
-| `opencollab_impact_estimator` | Impact tier + resume line |
-| `opencollab_repo_activity_pulse` | 30-day momentum — growing? dying? |
-| `opencollab_compare_repos` | Two repos side-by-side + winner |
-| `opencollab_repo_languages` | Language % breakdown |
-| `opencollab_dependency_check` | Tech stack — what libs the project uses |
-
-</details>
-
-<details>
-<summary><b>👤 Profile & Readiness (3)</b></summary>
-
-| Tool | Does |
-|---|---|
-| `opencollab_analyze_profile` | Deep profile analysis |
-| `opencollab_first_timer_score` | Open source readiness 0–100 + tips |
-| `opencollab_contributor_leaderboard` | Top contributors of any repo |
-
-</details>
-
-<details>
-<summary><b>🎯 Issue Intelligence (6)</b></summary>
-
-| Tool | Does |
-|---|---|
-| `opencollab_check_issue_availability` | Is this issue still free? |
-| `opencollab_issue_complexity` | Difficulty 1–10 |
-| `opencollab_stale_issue_finder` | Old unclaimed issues — hidden wins |
-| `opencollab_label_explorer` | All labels + beginner-friendly ones |
-| `opencollab_recent_prs` | Recently merged PRs — what gets accepted |
-| `opencollab_generate_pr_plan` | Full context for PR planning |
-
-</details>
-
----
-
-## ⚡ Why it's different
+<summary><strong>Example prompts</strong></summary>
 
 ```
-You ask Claude → Claude calls OpenCollab tools → Tools hit GitHub's free API → Data flows back → Claude reasons over it → You get a real, specific answer
+"Use OpenCollab to rate my GitHub profile (octocat) and tell me what to improve"
+"Find weekend issues in TypeScript I can finish in 2 hours"
+"Compare facebook/react vs vuejs/vue for first-time contributors"
+"Show me trending Python repos that mentor newcomers"
+"Is issue #123 in vercel/next.js still available?"
+"Plan a PR for issue #456 in microsoft/vscode"
 ```
 
-OpenCollab is a **data bridge**, not an AI. Your AI assistant does the thinking. That means:
+</details>
 
-- 🆓 **Zero AI costs** — pure GitHub API, no paid services
-- 🔑 **No secrets besides a free GitHub token**
-- 💻 **Runs locally** on your machine (STDIO transport)
-- 🔒 **Private** — your GitHub data never leaves your computer
-- ⚡ **Fast** — direct API calls, no middleware, no telemetry
+## How is this different from official `github-mcp-server`?
 
----
+GitHub's official MCP is a generic API proxy — every tool is a thin wrapper
+over a REST endpoint. **OpenCollab is opinionated for contribution discovery**.
+It computes scores, ranks issues by quickness-to-merge, evaluates community
+health, and chains multi-step workflows automatically. You wouldn't use a
+generic API wrapper to get a PR plan; you'd use OpenCollab.
 
-## 🏗️ Develop / Contribute
+## Configuration
 
-This project is itself a great first contribution target.
+| Env var | Default | Purpose |
+|---|---|---|
+| `GITHUB_TOKEN` | _(required)_ | GitHub PAT, `public_repo` scope is enough |
+| `TRANSPORT` | `stdio` | `stdio` (local) or `streamable-http` (remote) |
+| `PORT` | `8000` | Used when `TRANSPORT=streamable-http` |
+| `OPENCOLLAB_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
+## Remote deployment (Streamable HTTP)
+
+OpenCollab supports the new MCP Streamable HTTP transport (spec 2025-03-26).
+Deploy to any container platform:
 
 ```bash
-git clone https://github.com/prakhar1605/Opencollab-mcp.git
-cd Opencollab-mcp
-pip install -e .
-export GITHUB_TOKEN="your_token_here"
-python -m opencollab_mcp.server
-
-# Or test with the MCP Inspector:
-npx @modelcontextprotocol/inspector python -m opencollab_mcp.server
+docker build -t opencollab-mcp .
+docker run -p 8000:8000 -e TRANSPORT=streamable-http -e GITHUB_TOKEN=... opencollab-mcp
 ```
 
-Check [open issues](https://github.com/prakhar1605/Opencollab-mcp/issues) labelled `good first issue`.
+Then connect from Claude Desktop using the URL `http://localhost:8000/mcp`.
 
----
+## Roadmap
 
-## 🗺️ Roadmap
+- [x] 8 consolidated tools, full test coverage
+- [x] Connection-pooled HTTP client + 5-min response cache
+- [x] Streamable HTTP transport
+- [ ] `first_pr_generator` — chain match → check → plan → draft via Claude API
+- [ ] GraphQL queries for heavy tools (`plan_pr`, `compare_repos`)
+- [ ] Hosted `opencollab.dev` with web UI
+- [ ] Outcome tracking — did your matched issue actually merge?
 
-- [x] 22 tools shipped
-- [x] **Published on PyPI — `uvx opencollab-mcp` works out of the box**
-- [ ] In-memory caching layer (fewer API calls, less rate-limit friction)
-- [ ] `first_pr_generator` — one-shot "find + plan + draft my first PR"
-- [ ] `track_my_prs` — dashboard of your open PRs with staleness nudges
-- [ ] `skill_gap` — compare your skills vs a target repo's stack
-- [ ] GitHub Actions CI
-- [ ] SSE/remote deployment
+## Contributing
 
-Got an idea? [Open an issue](https://github.com/prakhar1605/Opencollab-mcp/issues/new) — that's the fastest path in.
+PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The whole point of this
+project is to make contributing easier, so it would be deeply ironic for it
+to be hard to contribute to.
 
----
+## License
 
-## 📄 License
-
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-
-**Built with ❤️ by [Prakhar Pandey](https://github.com/prakhar1605)** · IIT Guwahati
-
-⭐ **Star this repo if OpenCollab helps you land a PR.** ⭐  
-*It's the single biggest thing you can do to help other devs discover it.*
-
-[Install now](#-install-in-60-seconds) · [Report a bug](https://github.com/prakhar1605/Opencollab-mcp/issues) · [Share on Twitter](https://twitter.com/intent/tweet?text=Just%20found%20OpenCollab%20MCP%20%E2%80%94%20it%20finds%20me%20mergeable%20open%20source%20issues%20in%2030%20seconds.%20Works%20with%20Claude%20Desktop%2C%20Cursor%2C%20VS%20Code.%20pip%20install%20opencollab-mcp&url=https://github.com/prakhar1605/Opencollab-mcp)
-
+Made with ❤️ for everyone who's stared at "good first issue" filters
+wondering which one is actually a good first issue.
 </div>
