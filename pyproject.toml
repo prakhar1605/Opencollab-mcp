@@ -60,5 +60,8 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
+# E (pycodestyle errors), F (pyflakes), W (warnings), I (import order),
+# UP (pyupgrade), B (bugbear). Ignoring E501 (long lines — covered by formatter)
+# and E701 (single-line if-statements — fine for compact score-mapping blocks).
 select = ["E", "F", "W", "I", "UP", "B"]
-ignore = ["E501"]
+ignore = ["E501", "E701"]

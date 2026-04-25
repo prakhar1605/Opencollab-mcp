@@ -8,17 +8,17 @@ from datetime import datetime
 
 from mcp.server.fastmcp import FastMCP
 
-from ..github_client import github_get, handle_github_error
-from ..helpers import days_ago, truncate, parse_issue_number, decode_base64_content
-from ..models import RepoInput, IssueInput
 from ..constants import (
     BEGINNER_LABEL_KEYWORDS,
-    EASY_ISSUE_LABELS,
-    HARD_ISSUE_LABELS,
+    COMPLEXITY_ADVANCED,
     COMPLEXITY_BEGINNER,
     COMPLEXITY_INTERMEDIATE,
-    COMPLEXITY_ADVANCED,
+    EASY_ISSUE_LABELS,
+    HARD_ISSUE_LABELS,
 )
+from ..github_client import github_get, handle_github_error
+from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
+from ..models import IssueInput, RepoInput
 
 
 def _bad_issue_number(raw: str, err: Exception) -> str:

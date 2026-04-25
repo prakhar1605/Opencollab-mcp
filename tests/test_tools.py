@@ -8,12 +8,10 @@ These don't deeply test scoring — they verify that:
 from __future__ import annotations
 
 import json
+
 import pytest
 
 from opencollab_mcp.server import build_server
-from opencollab_mcp.tools import discovery, evaluation, issues, profile
-from opencollab_mcp.models import RepoInput, UsernameInput, IssueInput, LanguageInput
-
 
 EXPECTED_TOOL_NAMES = {
     # Discovery (6)
@@ -45,12 +43,43 @@ EXPECTED_TOOL_NAMES = {
 }
 
 
+async def _list_tools_compat(server):
+    """FastMCP's list_tools() may be sync or async depending on SDK version."""
+    result = server.list_tools()
+    if hasattr(result, "__await__"):
+        result = await result
+    return result
+
+
+async def _call_tool_compat(server, name: str, arguments: dict):
+    """FastMCP's call_tool() may be sync or async depending on SDK version."""
+    result = server.call_tool(name, arguments)
+    if hasattr(result, "__await__"):
+        result = await result
+    return result
+
+
+def _extract_text(result) -> str:
+    """Pull JSON text out of a FastMCP tool result, regardless of return shape."""
+    if isinstance(result, tuple):
+        result = result[0]
+    if isinstance(result, list) and result:
+        first = result[0]
+        if hasattr(first, "text"):
+            return first.text
+        if isinstance(first, dict) and "text" in first:
+            return first["text"]
+    if hasattr(result, "text"):
+        return result.text
+    return str(result)
+
+
 @pytest.mark.asyncio
 async def test_all_22_tools_registered():
     server = build_server()
-    registered = {t.name for t in await server.list_tools()}
+    tools = await _list_tools_compat(server)
+    registered = {t.name for t in tools}
     missing = EXPECTED_TOOL_NAMES - registered
-    extra = registered - EXPECTED_TOOL_NAMES
     assert not missing, f"missing tools: {missing}"
     assert len(EXPECTED_TOOL_NAMES) == 22
 
@@ -68,16 +97,13 @@ async def test_impact_estimator_low_stars(mock_github):
             "topics": [],
         }
     })
-    # Pull the registered tool out of the server and call it.
     server = build_server()
-    tools = await server.list_tools()
-    impact_tool = next(t for t in tools if t.name == "opencollab_impact_estimator")
-    result = await server.call_tool(
-        impact_tool.name, {"params": {"owner": "me", "repo": "tinylib"}}
+    result = await _call_tool_compat(
+        server,
+        "opencollab_impact_estimator",
+        {"params": {"owner": "me", "repo": "tinylib"}},
     )
-    # FastMCP returns a list of content items; first is the JSON text.
-    text = result[0].text if hasattr(result[0], "text") else result[0]["text"]
-    parsed = json.loads(text)
+    parsed = json.loads(_extract_text(result))
     assert parsed["impact_tier"] == "LOW"
     assert parsed["stars"] == 5
 
@@ -95,13 +121,12 @@ async def test_impact_estimator_massive_stars(mock_github):
         }
     })
     server = build_server()
-    tools = await server.list_tools()
-    impact_tool = next(t for t in tools if t.name == "opencollab_impact_estimator")
-    result = await server.call_tool(
-        impact_tool.name, {"params": {"owner": "big", "repo": "famous"}}
+    result = await _call_tool_compat(
+        server,
+        "opencollab_impact_estimator",
+        {"params": {"owner": "big", "repo": "famous"}},
     )
-    text = result[0].text if hasattr(result[0], "text") else result[0]["text"]
-    parsed = json.loads(text)
+    parsed = json.loads(_extract_text(result))
     assert parsed["impact_tier"] == "MASSIVE"
 
 
@@ -109,13 +134,11 @@ async def test_impact_estimator_massive_stars(mock_github):
 async def test_check_issue_availability_invalid_number(mock_github):
     """The tool should return a friendly error JSON, not raise."""
     server = build_server()
-    tools = await server.list_tools()
-    tool = next(t for t in tools if t.name == "opencollab_check_issue_availability")
-    result = await server.call_tool(
-        tool.name,
+    result = await _call_tool_compat(
+        server,
+        "opencollab_check_issue_availability",
         {"params": {"owner": "x", "repo": "y", "issue_number": "not-a-number"}},
     )
-    text = result[0].text if hasattr(result[0], "text") else result[0]["text"]
-    parsed = json.loads(text)
+    parsed = json.loads(_extract_text(result))
     assert "error" in parsed
     assert "Invalid issue_number" in parsed["error"]

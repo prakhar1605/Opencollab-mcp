@@ -7,19 +7,19 @@ import json
 
 from mcp.server.fastmcp import FastMCP
 
-from ..github_client import github_get, handle_github_error
-from ..helpers import days_ago, decode_base64_content
-from ..models import RepoInput, CompareInput
 from ..constants import (
+    DEPENDENCY_FILES,
     HEALTH_VERDICT_EXCELLENT,
-    HEALTH_VERDICT_GOOD,
     HEALTH_VERDICT_FAIR,
-    IMPACT_MASSIVE_STARS,
+    HEALTH_VERDICT_GOOD,
     IMPACT_HIGH_STARS,
+    IMPACT_MASSIVE_STARS,
     IMPACT_MEDIUM_STARS,
     IMPACT_MODERATE_STARS,
-    DEPENDENCY_FILES,
 )
+from ..github_client import github_get, handle_github_error
+from ..helpers import days_ago, decode_base64_content
+from ..models import CompareInput, RepoInput
 
 
 def register(mcp: FastMCP) -> None:

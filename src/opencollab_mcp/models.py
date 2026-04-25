@@ -6,7 +6,7 @@ LLM-generated tool calls passing through stray keys.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UsernameInput(BaseModel):

@@ -6,10 +6,10 @@ import json
 
 from mcp.server.fastmcp import FastMCP
 
+from ..constants import READINESS_ALMOST, READINESS_GETTING_STARTED, READINESS_READY
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, truncate
-from ..models import UsernameInput, RepoInput
-from ..constants import READINESS_READY, READINESS_ALMOST, READINESS_GETTING_STARTED
+from ..models import RepoInput, UsernameInput
 
 
 def register(mcp: FastMCP) -> None:

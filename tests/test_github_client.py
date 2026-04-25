@@ -16,7 +16,7 @@ async def test_github_get_returns_json(mock_github):
 
 
 @pytest.mark.asyncio
-async def test_github_get_caches_results(mock_github):
+async def test_github_get_caches_results(monkeypatch):
     """Second call to the same path should hit the cache, not the network."""
     call_count = {"n": 0}
 
@@ -31,15 +31,12 @@ async def test_github_get_caches_results(mock_github):
         kwargs["transport"] = transport
         return real_async_client(*args, **kwargs)
 
-    import httpx as httpx_mod
-    httpx_mod.AsyncClient = _patched
-    try:
-        a = await github_client.github_get("/users/cached")
-        b = await github_client.github_get("/users/cached")
-        assert a == b
-        assert call_count["n"] == 1, "cache should have served second call"
-    finally:
-        httpx_mod.AsyncClient = real_async_client
+    monkeypatch.setattr(httpx, "AsyncClient", _patched)
+
+    a = await github_client.github_get("/users/cached")
+    b = await github_client.github_get("/users/cached")
+    assert a == b
+    assert call_count["n"] == 1, "cache should have served second call"
 
 
 @pytest.mark.asyncio

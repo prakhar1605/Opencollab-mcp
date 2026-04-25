@@ -6,11 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 from opencollab_mcp.models import (
-    UsernameInput,
-    RepoInput,
+    CompareInput,
     IssueInput,
     LanguageInput,
-    CompareInput,
+    RepoInput,
+    UsernameInput,
 )
 
 

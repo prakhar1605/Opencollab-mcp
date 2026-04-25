@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
@@ -43,7 +43,7 @@ def mock_github(monkeypatch) -> Callable[[dict[str, Any]], None]:
             status, body = spec
         else:
             status, body = 200, spec
-        if isinstance(body, (dict, list)):
+        if isinstance(body, dict | list):
             return httpx.Response(status, json=body)
         return httpx.Response(status, content=body)
 

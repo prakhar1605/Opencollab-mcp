@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64 as _base64
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def days_ago(iso_str: str | None) -> int | None:

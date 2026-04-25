@@ -7,16 +7,16 @@ import json
 
 from mcp.server.fastmcp import FastMCP
 
-from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, truncate, recent_date_str
-from ..models import UsernameInput, RepoInput, LanguageInput
 from ..constants import (
+    MENTOR_REPOS_DAYS,
+    QUICK_WEEKEND_LABELS,
     RECENT_ISSUES_DAYS,
     RECENT_TRENDING_DAYS,
-    MENTOR_REPOS_DAYS,
     WEEKEND_ISSUES_DAYS,
-    QUICK_WEEKEND_LABELS,
 )
+from ..github_client import github_get, github_search, handle_github_error
+from ..helpers import days_ago, recent_date_str, truncate
+from ..models import LanguageInput, RepoInput, UsernameInput
 
 
 def register(mcp: FastMCP) -> None:

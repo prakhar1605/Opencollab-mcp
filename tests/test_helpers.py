@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from opencollab_mcp.helpers import (
     days_ago,
-    truncate,
-    recent_date_str,
-    parse_issue_number,
     decode_base64_content,
+    parse_issue_number,
+    recent_date_str,
+    truncate,
 )
 
 

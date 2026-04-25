@@ -12,17 +12,17 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
 from .constants import (
-    GITHUB_API_BASE,
-    DEFAULT_TIMEOUT,
-    USER_AGENT,
-    GITHUB_API_VERSION,
-    CACHE_TTL_SECONDS,
     CACHE_MAX_ENTRIES,
+    CACHE_TTL_SECONDS,
+    DEFAULT_TIMEOUT,
+    GITHUB_API_BASE,
+    GITHUB_API_VERSION,
+    USER_AGENT,
 )
 
 logger = logging.getLogger("opencollab_mcp.github")
@@ -33,7 +33,7 @@ logger = logging.getLogger("opencollab_mcp.github")
 _cache: dict[str, tuple[float, Any]] = {}
 
 
-def _cache_key(path: str, params: Optional[dict[str, Any]]) -> str:
+def _cache_key(path: str, params: dict[str, Any] | None) -> str:
     if not params:
         return path
     items = sorted((k, str(v)) for k, v in params.items())
@@ -81,7 +81,7 @@ def _get_headers() -> dict[str, str]:
 
 async def github_get(
     path: str,
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
     *,
     use_cache: bool = True,
 ) -> Any:
@@ -124,7 +124,7 @@ async def github_get(
 async def github_search(
     endpoint: str,
     query: str,
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
 ) -> Any:
     """Search GitHub (issues, repos, etc.)."""
     merged = {"q": query, "per_page": 30, **(params or {})}
