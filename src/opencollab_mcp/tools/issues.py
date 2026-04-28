@@ -151,8 +151,8 @@ def register(mcp: FastMCP) -> None:
         if checklist_items > 5: score += 2
         elif checklist_items > 0: score += 1
 
-        code_blocks = body.count("```")
-        if code_blocks > 4: score += 2
+        code_blocks = body.count("```") // 2
+        if code_blocks > 2: score += 2
         elif code_blocks > 0: score += 1
 
         score = max(1, min(score, 10))
@@ -175,7 +175,7 @@ def register(mcp: FastMCP) -> None:
                 "body_length": body_len,
                 "comments": comments_count,
                 "checklist_items": checklist_items,
-                "code_blocks_in_body": code_blocks // 2,
+                "code_blocks_in_body": code_blocks,
                 "has_beginner_label": has_easy,
                 "has_hard_label": has_hard,
                 "labels": labels,
