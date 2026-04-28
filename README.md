@@ -46,6 +46,15 @@ One sentence. A real mergeable issue.
 
 ## 📦 Install in 60 seconds
 
+> **Heads up:** an MCP server has **two install steps**, not one. This trips most people up the first time:
+>
+> 1. **Get the code on your machine** — usually `pip install` or `uvx` (auto-installs on first run).
+> 2. **Tell your AI client about it** — add a small JSON entry to your client's config file.
+>
+> Step 2 is what registers OpenCollab as a tool your AI can actually call. Without it, `pip install opencollab-mcp` just sits in your site-packages doing nothing — Claude Desktop has no way to know it exists. The JSON tells Claude *"here's a server, launch it like this, with this token."*
+>
+> Both steps are quick. Recipes for every major client below.
+
 ### 1. Get a free GitHub token
 
 [github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)** → check `public_repo` → copy.
@@ -78,6 +87,8 @@ Add this:
 
 Restart Claude Desktop. Done.
 
+> **Why no `pip install` step here?** `uvx` does it for you — on first launch it pulls `opencollab-mcp` from PyPI, caches it, and runs it. No manual install needed. (You do need [`uv`](https://docs.astral.sh/uv/) installed; on macOS it's `brew install uv`.)
+
 </details>
 
 <details>
@@ -102,13 +113,19 @@ Add to `.cursor/mcp.json` or your VS Code MCP config:
 </details>
 
 <details>
-<summary><b>🐍 Install with pip</b></summary>
+<summary><b>🐍 Prefer plain pip over uvx?</b></summary>
+
+If you don't want to install `uv`, use `pip` directly. Two steps:
+
+**Step A — install the package:**
 
 ```bash
 pip install opencollab-mcp
 ```
 
-Then in your MCP config:
+This puts an `opencollab-mcp` command on your PATH.
+
+**Step B — register it with Claude Desktop** (or Cursor/VS Code):
 
 ```json
 {
@@ -122,6 +139,10 @@ Then in your MCP config:
   }
 }
 ```
+
+Notice the difference vs the `uvx` recipe above: `command` is now just `opencollab-mcp` (the binary pip put on your PATH) instead of `uvx`. The JSON entry is still required — it's how Claude knows the server exists.
+
+**Heads up about `pip`:** if you upgrade Python or switch virtualenvs, the `opencollab-mcp` binary may disappear and you'll need to `pip install` again. That's why `uvx` is recommended — it manages this automatically.
 
 </details>
 
