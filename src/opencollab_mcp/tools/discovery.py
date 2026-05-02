@@ -51,6 +51,9 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             return handle_github_error(e)
 
+        # TODO: exclude_topics not applied here — issue payloads don't include topics.
+        # Would require an extra repo lookup per issue (rate-limit concern). Deferred to follow-up PR.
+
         issues = []
         for item in result.get("items", []):
             repo_url = item.get("repository_url", "")
@@ -116,6 +119,14 @@ def register(mcp: FastMCP) -> None:
             }
             for r in result.get("items", [])
         ]
+
+        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        if normalized_exclude:
+            repos = [
+                r for r in repos
+                if not any(topic in normalized_exclude for topic in r.get("topics", []))
+            ]
+
         return json.dumps({
             "total_found": result.get("total_count", 0),
             "repos": repos,
@@ -238,6 +249,14 @@ def register(mcp: FastMCP) -> None:
                     "last_push_days_ago": days_ago(r.get("pushed_at")),
                 })
         repos.sort(key=lambda x: len(x.get("mentor_signals", [])), reverse=True)
+
+        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        if normalized_exclude:
+            repos = [
+                r for r in repos
+                if not any(topic in normalized_exclude for topic in r.get("topics", []))
+            ]
+
         return json.dumps({
             "language": params.language,
             "mentor_repos": repos[:15],
@@ -272,6 +291,9 @@ def register(mcp: FastMCP) -> None:
             *(_search_label(label) for label in QUICK_WEEKEND_LABELS[:5]),
             return_exceptions=True,
         )
+
+        # TODO: exclude_topics not applied here — issue payloads don't include topics.
+        # Would require an extra repo lookup per issue (rate-limit concern). Deferred to follow-up PR.
 
         all_issues: list[dict] = []
         seen_urls: set[str] = set()
