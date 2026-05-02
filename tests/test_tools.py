@@ -142,3 +142,85 @@ async def test_check_issue_availability_invalid_number(mock_github):
     parsed = json.loads(_extract_text(result))
     assert "error" in parsed
     assert "Invalid issue_number" in parsed["error"]
+
+
+@pytest.mark.asyncio
+async def test_trending_repos_excludes_topics(mock_github):
+    mock_github({
+        "/search/repositories": {
+            "items": [
+                {"full_name": "ml-repo", "topics": ["machine-learning", "python"], "description": ""},
+                {"full_name": "web-repo", "topics": ["fastapi", "python"], "description": ""}
+            ]
+        }
+    })
+    server = build_server()
+    result = await _call_tool_compat(
+        server,
+        "opencollab_trending_repos",
+        {"params": {"language": "Python", "exclude_topics": ["machine-learning"]}},
+    )
+    parsed = json.loads(_extract_text(result))
+    repo_names = [r["name"] for r in parsed["repos"]]
+    assert "ml-repo" not in repo_names
+    assert "web-repo" in repo_names
+
+
+@pytest.mark.asyncio
+async def test_trending_repos_no_exclusion(mock_github):
+    mock_github({
+        "/search/repositories": {
+            "items": [
+                {"full_name": "ml-repo", "topics": ["machine-learning"], "description": ""},
+                {"full_name": "web-repo", "topics": ["fastapi"], "description": ""}
+            ]
+        }
+    })
+    server = build_server()
+    result = await _call_tool_compat(
+        server,
+        "opencollab_trending_repos",
+        {"params": {"language": "Python", "exclude_topics": None}},
+    )
+    parsed = json.loads(_extract_text(result))
+    assert len(parsed["repos"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_find_mentor_repos_excludes_topics(mock_github):
+    mock_github({
+        "/search/repositories": {
+            "items": [
+                {
+                    "full_name": "ml-mentors",
+                    "topics": [
+                        "python",
+                        "fastapi",
+                        "api",
+                        "backend",
+                        "docs",
+                        "tools",
+                        "cli",
+                        "server",
+                        "Machine-Learning",
+                    ],
+                    "description": "",
+                },
+                {
+                    "full_name": "oss-mentors",
+                    "topics": ["mentorship", "python"],
+                    "description": "",
+                },
+            ]
+        }
+    })
+    server = build_server()
+    result = await _call_tool_compat(
+        server,
+        "opencollab_find_mentor_repos",
+        {"params": {"language": "Python", "exclude_topics": ["machine-learning"]}},
+    )
+    parsed = json.loads(_extract_text(result))
+    repo_names = [r["name"] for r in parsed["mentor_repos"]]
+    assert "ml-mentors" not in repo_names
+    assert "oss-mentors" in repo_names
