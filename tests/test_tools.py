@@ -184,3 +184,43 @@ async def test_trending_repos_no_exclusion(mock_github):
     )
     parsed = json.loads(_extract_text(result))
     assert len(parsed["repos"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_find_mentor_repos_excludes_topics(mock_github):
+    mock_github({
+        "/search/repositories": {
+            "items": [
+                {
+                    "full_name": "ml-mentors",
+                    "topics": [
+                        "python",
+                        "fastapi",
+                        "api",
+                        "backend",
+                        "docs",
+                        "tools",
+                        "cli",
+                        "server",
+                        "Machine-Learning",
+                    ],
+                    "description": "",
+                },
+                {
+                    "full_name": "oss-mentors",
+                    "topics": ["mentorship", "python"],
+                    "description": "",
+                },
+            ]
+        }
+    })
+    server = build_server()
+    result = await _call_tool_compat(
+        server,
+        "opencollab_find_mentor_repos",
+        {"params": {"language": "Python", "exclude_topics": ["machine-learning"]}},
+    )
+    parsed = json.loads(_extract_text(result))
+    repo_names = [r["name"] for r in parsed["mentor_repos"]]
+    assert "ml-mentors" not in repo_names
+    assert "oss-mentors" in repo_names

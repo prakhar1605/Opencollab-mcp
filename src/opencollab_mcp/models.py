@@ -41,9 +41,9 @@ class LanguageInput(BaseModel):
         min_length=1,
     )
     exclude_topics: list[str] | None = Field(
-    default=None,
-    description="Topics to exclude from results (e.g. ['machine-learning', 'pytorch'])",
-)
+        default=None,
+        description="Topics to exclude from results (e.g. ['machine-learning', 'pytorch'])",
+    )
 
 
 class CompareInput(BaseModel):

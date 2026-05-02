@@ -104,28 +104,25 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             return handle_github_error(e)
 
-        repos = [
-            {
+        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        repos = []
+        for r in result.get("items", []):
+            topics = r.get("topics", []) or []
+            if normalized_exclude:
+                if any(topic.lower().strip() in normalized_exclude for topic in topics):
+                    continue
+            repos.append({
                 "name": r.get("full_name", ""),
                 "description": truncate(r.get("description"), 150),
                 "stars": r.get("stargazers_count", 0),
                 "forks": r.get("forks_count", 0),
                 "language": r.get("language"),
                 "open_issues": r.get("open_issues_count", 0),
-                "topics": r.get("topics", [])[:8],
+                "topics": topics[:8],
                 "url": r.get("html_url", ""),
                 "created_days_ago": days_ago(r.get("created_at")),
                 "last_push_days_ago": days_ago(r.get("pushed_at")),
-            }
-            for r in result.get("items", [])
-        ]
-
-        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
-        if normalized_exclude:
-            repos = [
-                r for r in repos
-                if not any(topic in normalized_exclude for topic in r.get("topics", []))
-            ]
+            })
 
         return json.dumps({
             "total_found": result.get("total_count", 0),
@@ -215,6 +212,16 @@ def register(mcp: FastMCP) -> None:
             f"language:{params.language} topic:gsoc good-first-issues:>1 pushed:>{since}",
             f"language:{params.language} topic:mentorship good-first-issues:>1 pushed:>{since}",
         ]
+        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        mentor_topic_signals = {
+            "hacktoberfest",
+            "gsoc",
+            "outreachy",
+            "mentorship",
+            "good-first-issue",
+            "beginner-friendly",
+            "first-timers-only",
+        }
         seen: set[str] = set()
         repos: list[dict] = []
         # Run all three searches in parallel — they're independent.
@@ -231,11 +238,13 @@ def register(mcp: FastMCP) -> None:
                 if name in seen:
                     continue
                 seen.add(name)
-                topics = r.get("topics", [])
+                topics = r.get("topics", []) or []
+                if normalized_exclude:
+                    if any(topic.lower().strip() in normalized_exclude for topic in topics):
+                        continue
                 mentor_signals = [
                     t for t in topics
-                    if t in ("hacktoberfest", "gsoc", "outreachy", "mentorship",
-                             "good-first-issue", "beginner-friendly", "first-timers-only")
+                    if t.lower().strip() in mentor_topic_signals
                 ]
                 repos.append({
                     "name": name,
@@ -249,13 +258,6 @@ def register(mcp: FastMCP) -> None:
                     "last_push_days_ago": days_ago(r.get("pushed_at")),
                 })
         repos.sort(key=lambda x: len(x.get("mentor_signals", [])), reverse=True)
-
-        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
-        if normalized_exclude:
-            repos = [
-                r for r in repos
-                if not any(topic in normalized_exclude for topic in r.get("topics", []))
-            ]
 
         return json.dumps({
             "language": params.language,
