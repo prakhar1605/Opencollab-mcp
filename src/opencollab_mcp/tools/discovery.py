@@ -53,6 +53,8 @@ def register(mcp: FastMCP) -> None:
 
         # TODO: exclude_topics not applied here — issue payloads don't include topics.
         # Would require an extra repo lookup per issue (rate-limit concern). Deferred to follow-up PR.
+        if params.exclude_topics:
+            return json.dumps({"warning": "exclude_topics is not yet supported for this tool — issue payloads don't include topics. Use trending_repos or find_mentor_repos for topic filtering."})
 
         issues = []
         for item in result.get("items", []):
@@ -104,7 +106,7 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             return handle_github_error(e)
 
-        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        normalized_exclude = {t.lower().strip() for t in (params.exclude_topics or [])}
         repos = []
         for r in result.get("items", []):
             topics = r.get("topics", []) or []
@@ -212,7 +214,7 @@ def register(mcp: FastMCP) -> None:
             f"language:{params.language} topic:gsoc good-first-issues:>1 pushed:>{since}",
             f"language:{params.language} topic:mentorship good-first-issues:>1 pushed:>{since}",
         ]
-        normalized_exclude = [t.lower().strip() for t in (params.exclude_topics or [])]
+        normalized_exclude = {t.lower().strip() for t in (params.exclude_topics or [])}
         mentor_topic_signals = {
             "hacktoberfest",
             "gsoc",
