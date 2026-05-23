@@ -1,7 +1,7 @@
 """OpenCollab MCP Server — AI-powered open source contribution matchmaker.
 
-Slim entry point. All 22 tools live in src/opencollab_mcp/tools/, organized
-by category to match the four sections in the README.
+Slim entry point. All 6 tools live in src/opencollab_mcp/tools/, organized
+by category to match the three sections in the README.
 
 Supports both STDIO (local) and streamable-HTTP (remote) transports.
 Set TRANSPORT=streamable-http and optionally PORT=8000 for remote deployment.
@@ -14,7 +14,7 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from .tools import discovery, evaluation, issues, profile
+from .tools import discovery, evaluation, issues
 
 
 def _configure_logging() -> None:
@@ -27,12 +27,11 @@ def _configure_logging() -> None:
 
 
 def build_server() -> FastMCP:
-    """Build and register all 22 tools onto a FastMCP instance."""
+    """Build and register all 6 tools onto a FastMCP instance."""
     mcp = FastMCP("opencollab_mcp")
     discovery.register(mcp)
     evaluation.register(mcp)
     issues.register(mcp)
-    profile.register(mcp)
     return mcp
 
 

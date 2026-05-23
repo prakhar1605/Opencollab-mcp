@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opencollab-mcp"
-version = "0.5.0"
-description = "AI-powered open source contribution matchmaker — finds perfect 'good first issues' matched to YOUR skills"
+version = "0.6.0"
+description = "An MCP server that finds matching 'good first issues' on GitHub for your AI assistant to recommend"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
