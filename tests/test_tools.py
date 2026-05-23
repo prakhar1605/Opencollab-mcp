@@ -1,7 +1,7 @@
 """Smoke tests for tool registration and end-to-end JSON shape.
 
 These don't deeply test scoring — they verify that:
-  1. All 22 tools register on the server.
+  1. All 6 tools register on the server.
   2. The tools return well-formed JSON, not exceptions, for happy-path inputs.
 """
 
@@ -14,32 +14,15 @@ import pytest
 from opencollab_mcp.server import build_server
 
 EXPECTED_TOOL_NAMES = {
-    # Discovery (6)
+    # Discovery (2)
     "opencollab_find_issues",
-    "opencollab_trending_repos",
-    "opencollab_similar_repos",
-    "opencollab_find_mentor_repos",
-    "opencollab_weekend_issues",
     "opencollab_match_me",
-    # Evaluation (7)
+    # Evaluation (2)
     "opencollab_repo_health",
-    "opencollab_contribution_readiness",
     "opencollab_impact_estimator",
-    "opencollab_repo_activity_pulse",
-    "opencollab_compare_repos",
-    "opencollab_repo_languages",
-    "opencollab_dependency_check",
-    # Issues (6)
+    # Issues (2)
     "opencollab_check_issue_availability",
-    "opencollab_issue_complexity",
-    "opencollab_stale_issue_finder",
-    "opencollab_label_explorer",
-    "opencollab_recent_prs",
     "opencollab_generate_pr_plan",
-    # Profile (3)
-    "opencollab_analyze_profile",
-    "opencollab_first_timer_score",
-    "opencollab_contributor_leaderboard",
 }
 
 
@@ -75,13 +58,13 @@ def _extract_text(result) -> str:
 
 
 @pytest.mark.asyncio
-async def test_all_22_tools_registered():
+async def test_all_tools_registered():
     server = build_server()
     tools = await _list_tools_compat(server)
     registered = {t.name for t in tools}
     missing = EXPECTED_TOOL_NAMES - registered
     assert not missing, f"missing tools: {missing}"
-    assert len(EXPECTED_TOOL_NAMES) == 22
+    assert len(EXPECTED_TOOL_NAMES) == 6
 
 
 @pytest.mark.asyncio

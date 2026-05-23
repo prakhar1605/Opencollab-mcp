@@ -40,11 +40,3 @@ class LanguageInput(BaseModel):
         description="Programming language (e.g. 'Python', 'TypeScript', 'Rust')",
         min_length=1,
     )
-
-
-class CompareInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    owner_a: str = Field(..., description="First repo owner (e.g. 'langchain-ai')", min_length=1)
-    repo_a: str = Field(..., description="First repo name (e.g. 'langchain')", min_length=1)
-    owner_b: str = Field(..., description="Second repo owner (e.g. 'run-llama')", min_length=1)
-    repo_b: str = Field(..., description="Second repo name (e.g. 'llama_index')", min_length=1)

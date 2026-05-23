@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from opencollab_mcp.models import (
-    CompareInput,
     IssueInput,
     LanguageInput,
     RepoInput,
@@ -59,15 +58,3 @@ def test_issue_input_accepts_hashed_number():
 def test_language_input_required():
     with pytest.raises(ValidationError):
         LanguageInput()  # type: ignore
-
-
-def test_compare_input_all_four_required():
-    with pytest.raises(ValidationError):
-        CompareInput(owner_a="a", repo_a="b", owner_b="c")  # type: ignore
-
-
-def test_compare_input_strips_all():
-    m = CompareInput(
-        owner_a=" a ", repo_a=" b ", owner_b=" c ", repo_b=" d ",
-    )
-    assert (m.owner_a, m.repo_a, m.owner_b, m.repo_b) == ("a", "b", "c", "d")
