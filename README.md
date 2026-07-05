@@ -282,11 +282,7 @@ The full 22-tool catalogue still lives on the [`v1-full`](https://github.com/pra
 
 ---
 
-## Contributors
 
-- [@Shashank-Tripathi-07](https://github.com/Shashank-Tripathi-07) — flagged a double-counting bug in `issue_complexity`'s code-block scoring, and pointed out that `main` had no branch protection (which has since been fixed).
-
----
 
 ## License
 
