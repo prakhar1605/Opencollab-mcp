@@ -1,6 +1,6 @@
 """OpenCollab MCP — AI-powered open source contribution matchmaker."""
 
-__version__ = "0.5.0"
+__version__ = "0.6.1"
 
 from .server import build_server, main, mcp
 

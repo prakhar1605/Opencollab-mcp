@@ -46,13 +46,19 @@ def main() -> None:
 
     if transport in ("streamable-http", "http"):
         port = int(os.environ.get("PORT", "8000"))
+        # FastMCP.run() only accepts transport/mount_path; host and port
+        # must be configured through settings.
+        mcp.settings.host = "0.0.0.0"
+        mcp.settings.port = port
         logger.info("Starting OpenCollab MCP on streamable-http (port %d)", port)
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+        mcp.run(transport="streamable-http")
     elif transport == "sse":
         # Legacy SSE transport — kept for backwards compatibility.
         port = int(os.environ.get("PORT", "8000"))
+        mcp.settings.host = "0.0.0.0"
+        mcp.settings.port = port
         logger.info("Starting OpenCollab MCP on SSE (port %d)", port)
-        mcp.run(transport="sse", host="0.0.0.0", port=port)
+        mcp.run(transport="sse")
     else:
         logger.info("Starting OpenCollab MCP on stdio")
         mcp.run()
