@@ -106,7 +106,11 @@ def register(mcp: FastMCP) -> None:
             {"name": n, "percentage": round(b / total * 100, 1)}
             for n, b in top_langs
         ]
-        primary_lang = top_langs[0][0] if top_langs else "Python"
+        # A profile with no owned repo carrying language data — a brand-new
+        # account, a fork-only account, an org-only contributor — would
+        # otherwise be served Python issues as though Python had been detected.
+        language_detected = bool(top_langs)
+        primary_lang = top_langs[0][0] if language_detected else "Python"
         since = recent_date_str(RECENT_ISSUES_DAYS)
         try:
             result = await github_search(
@@ -129,11 +133,23 @@ def register(mcp: FastMCP) -> None:
             }
             for it in result.get("items", [])
         ]
-        return json.dumps({
+        payload: dict[str, object] = {
             "username": params.username,
             "name": user.get("name"),
             "top_languages": languages,
             "topics": sorted(topics_set)[:10],
             "matched_language": primary_lang,
             "matched_issues": issues,
-        }, indent=2)
+        }
+        if not language_detected:
+            # Present only when the fallback fired, so its presence is the
+            # signal — an assistant reading the response cannot miss it the way
+            # it can miss a null.
+            payload["language_fallback"] = True
+            payload["note"] = (
+                "No language data was found on this profile, so the search "
+                "defaulted to Python. These matches are not based on the "
+                "user's actual skills. Ask the user which language they want "
+                "and call opencollab_find_issues with it."
+            )
+        return json.dumps(payload, indent=2)
