@@ -24,14 +24,16 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def opencollab_find_issues(params: LanguageInput) -> str:
-        """Find beginner-friendly open-source issues labelled 'good first
-        issue' for a given programming language. Returns up to 15 recently
-        created issues from public repos.
+        """Find open-source issues by language and difficulty.
+        Beginner searches use the "good first issue" label, while intermediate
+        searches use the "help wanted" label. Returns up to 15 recently created
+        issues from public repos.
         """
         since = recent_date_str(RECENT_ISSUES_DAYS)
+        label = 'label:"good first issue"' if params.difficulty == "beginner" else 'label:"help wanted"'
         query_parts = [
             f"language:{params.language}",
-            'label:"good first issue"',
+            label,
             "state:open",
             f"created:>{since}",
             "is:public",
