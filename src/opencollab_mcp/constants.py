@@ -4,10 +4,22 @@ Pulling these out of individual tools keeps scoring logic self-documenting
 and makes tuning a one-line change instead of a hunt-and-peck across files.
 """
 
+from importlib.metadata import PackageNotFoundError, version
+
+# ---- Version ----
+# pyproject.toml is the single source of truth; everything else reads it back
+# out of the installed distribution metadata. A hard-coded copy here is how the
+# User-Agent came to advertise 0.6.0 while the package was 0.6.1.
+try:
+    __version__ = version("opencollab-mcp")
+except PackageNotFoundError:
+    # Running from a source tree that was never installed.
+    __version__ = "0.0.0-dev"
+
 # ---- API / network ----
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
-USER_AGENT = "opencollab-mcp/0.6.0"
+USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"
 
 # ---- Caching ----
