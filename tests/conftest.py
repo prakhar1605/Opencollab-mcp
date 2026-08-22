@@ -12,11 +12,18 @@ from opencollab_mcp import github_client
 
 
 @pytest.fixture(autouse=True)
-def _clear_cache():
-    """Every test gets a clean cache — prevents leakage across tests."""
+def _reset_client_state():
+    """Every test gets a clean cache and a fresh HTTP client.
+
+    Resetting the client matters as much as the cache: it is shared and
+    lazily created, so without this a test could reuse a client built by an
+    earlier test — one that was not built through this test's mock transport.
+    """
     github_client.clear_cache()
+    github_client.reset_client()
     yield
     github_client.clear_cache()
+    github_client.reset_client()
 
 
 @pytest.fixture
