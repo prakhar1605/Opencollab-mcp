@@ -66,6 +66,33 @@ def clear_cache() -> None:
 
 # ---- HTTP -----------------------------------------------------------------
 
+# One client, one connection pool. Tools like repo_health and
+# generate_pr_plan fan out 3-5 requests through asyncio.gather, and a
+# per-request client paid a fresh TCP + TLS handshake for every one of them.
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Return the shared client, creating it on first use."""
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+    return _client
+
+
+def reset_client() -> None:
+    """Drop the shared client so the next request builds a fresh one.
+
+    Useful for tests, in the same way as clear_cache(): a test that installs a
+    mock transport by patching httpx.AsyncClient needs the next request to go
+    through the patch rather than reuse a client built earlier. The old client
+    is not awaited closed — it holds only idle pooled connections, and this is
+    not a production code path.
+    """
+    global _client
+    _client = None
+
+
 def _get_headers() -> dict[str, str]:
     """Build auth headers from environment."""
     token = os.environ.get("GITHUB_TOKEN", "")
@@ -96,25 +123,24 @@ async def github_get(
         if cached is not None:
             return cached
 
-    async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        resp = await client.get(
-            f"{GITHUB_API_BASE}{path}",
-            headers=_get_headers(),
-            params=params or {},
-        )
+    resp = await _get_client().get(
+        f"{GITHUB_API_BASE}{path}",
+        headers=_get_headers(),
+        params=params or {},
+    )
 
-        # GitHub returns 202 with empty body while it computes statistics
-        # (commit_activity, participation, contributors on cold repos).
-        if resp.status_code == 202:
-            logger.info("GitHub returned 202 (stats computing) for %s", path)
-            return {}
+    # GitHub returns 202 with empty body while it computes statistics
+    # (commit_activity, participation, contributors on cold repos).
+    if resp.status_code == 202:
+        logger.info("GitHub returned 202 (stats computing) for %s", path)
+        return {}
 
-        resp.raise_for_status()
-        try:
-            data = resp.json()
-        except ValueError:
-            logger.warning("Non-JSON response from %s", path)
-            return {}
+    resp.raise_for_status()
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.warning("Non-JSON response from %s", path)
+        return {}
 
     if use_cache:
         _cache_set(key, data)
