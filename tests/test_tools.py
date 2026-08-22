@@ -12,6 +12,7 @@ import json
 import pytest
 
 from opencollab_mcp.server import build_server
+from opencollab_mcp.tools import discovery
 
 EXPECTED_TOOL_NAMES = {
     # Discovery (2)
@@ -125,3 +126,23 @@ async def test_check_issue_availability_invalid_number(mock_github):
     parsed = json.loads(_extract_text(result))
     assert "error" in parsed
     assert "Invalid issue_number" in parsed["error"]
+@pytest.mark.asyncio
+async def test_find_issues_intermediate_uses_help_wanted(monkeypatch):
+    captured_query = ""
+
+    async def fake_github_search(endpoint, query, params=None):
+        nonlocal captured_query
+        captured_query = query
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", fake_github_search)
+
+    server = build_server()
+    await _call_tool_compat(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "difficulty": "intermediate"}},
+    )
+
+    assert 'label:"help wanted"' in captured_query
+    assert 'label:"good first issue"' not in captured_query
