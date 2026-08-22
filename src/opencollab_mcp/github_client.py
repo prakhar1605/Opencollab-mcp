@@ -157,6 +157,26 @@ async def github_search(
     return await github_get(f"/search/{endpoint}", merged)
 
 
+def _reset_hint(response: httpx.Response) -> str:
+    """" Resets in ~N minutes." for a usable x-ratelimit-reset, else "".
+
+    The header is a Unix epoch timestamp. A missing, unparseable or already
+    past value yields nothing rather than a nonsense "resets in -3 minutes":
+    a vague message beats a wrong one.
+    """
+    raw = response.headers.get("x-ratelimit-reset", "")
+    try:
+        reset_at = int(raw)
+    except ValueError:
+        return ""
+    seconds = reset_at - time.time()
+    if seconds <= 0:
+        return ""
+    if seconds < 60:
+        return " Resets in under a minute."
+    return f" Resets in ~{round(seconds / 60)} minutes."
+
+
 def handle_github_error(e: Exception) -> str:
     """Return a human-friendly error string for GitHub API failures.
 
@@ -170,11 +190,19 @@ def handle_github_error(e: Exception) -> str:
         if code == 401:
             return ("Error: GitHub authentication failed. "
                     "Check your GITHUB_TOKEN environment variable.")
-        if code == 403:
-            remaining = e.response.headers.get("x-ratelimit-remaining", "?")
-            return (f"Error: GitHub API rate limit or permission issue "
-                    f"(remaining: {remaining}). Try again later or use a "
-                    f"token with more scopes.")
+        if code in (403, 429):
+            # GitHub says which of the two a 403 is: exhausted quota leaves
+            # x-ratelimit-remaining at "0", anything else is a permissions
+            # problem. Reporting them together sent people to check the wrong
+            # thing half the time. 429 is always a limit (secondary limits).
+            remaining = e.response.headers.get("x-ratelimit-remaining", "")
+            if code == 429 or remaining == "0":
+                return (f"Error: GitHub API rate limit exceeded."
+                        f"{_reset_hint(e.response)} Set GITHUB_TOKEN for a "
+                        f"5,000 requests/hour limit.")
+            return ("Error: GitHub denied access (403). Your token may be "
+                    "missing the 'public_repo' scope, or the resource is "
+                    "private.")
         if code == 404:
             return "Error: Resource not found on GitHub. Double-check the username or repo name."
         if code == 422:
