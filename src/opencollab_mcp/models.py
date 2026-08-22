@@ -6,6 +6,8 @@ LLM-generated tool calls passing through stray keys.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -32,11 +34,16 @@ class IssueInput(BaseModel):
         min_length=1,
     )
 
-
 class LanguageInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
     language: str = Field(
         ...,
         description="Programming language (e.g. 'Python', 'TypeScript', 'Rust')",
         min_length=1,
     )
+
+    difficulty: Literal["beginner", "intermediate"] = Field(
+        default="beginner",
+        description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
+)
