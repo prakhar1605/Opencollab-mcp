@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+main
 import time
+=======
+import asyncio
+
 
 import httpx
 import pytest
@@ -153,3 +157,93 @@ def test_handle_github_error_timeout():
 def test_handle_github_error_unknown():
     msg = github_client.handle_github_error(RuntimeError("boom"))
     assert "RuntimeError" in msg
+
+
+@pytest.mark.asyncio
+async def test_github_get_reuses_one_client(monkeypatch):
+    """One AsyncClient, one connection pool — not a handshake per request."""
+    constructions = {"n": 0}
+    built: list[httpx.AsyncClient] = []
+
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, json={"ok": True}))
+    real_async_client = httpx.AsyncClient
+
+    def _counting(*args, **kwargs):
+        constructions["n"] += 1
+        kwargs["transport"] = transport
+        client = real_async_client(*args, **kwargs)
+        built.append(client)
+        return client
+
+    monkeypatch.setattr(httpx, "AsyncClient", _counting)
+
+    # Distinct paths, so the cache cannot hide a second construction.
+    await github_client.github_get("/users/one")
+    await github_client.github_get("/users/two")
+    await github_client.github_get("/users/three")
+
+    assert constructions["n"] == 1, "a client was built per request"
+    assert built[0] is github_client._get_client()
+
+
+@pytest.mark.asyncio
+async def test_client_survives_between_requests(monkeypatch):
+    """The shared client must still be open after a request completes.
+
+    The previous implementation used `async with`, which closed the client at
+    the end of every call; reusing that object would raise.
+    """
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, json={}))
+    real_async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *a, **kw: real_async_client(*a, **{**kw, "transport": transport}),
+    )
+
+    await github_client.github_get("/users/first", use_cache=False)
+    client = github_client._get_client()
+
+    assert not client.is_closed
+    await github_client.github_get("/users/second", use_cache=False)
+    assert github_client._get_client() is client
+
+
+@pytest.mark.asyncio
+async def test_concurrent_requests_share_the_client(monkeypatch):
+    """The fan-out case from the issue: gather must not build N clients."""
+    constructions = {"n": 0}
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, json={}))
+    real_async_client = httpx.AsyncClient
+
+    def _counting(*args, **kwargs):
+        constructions["n"] += 1
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _counting)
+
+    await asyncio.gather(*(
+        github_client.github_get(f"/repos/o/r/{n}") for n in ("a", "b", "c", "d", "e")
+    ))
+
+    assert constructions["n"] == 1
+
+
+def test_reset_client_forces_a_new_one(monkeypatch):
+    """reset_client is the seam tests need after patching httpx.AsyncClient."""
+    first = github_client._get_client()
+    assert github_client._get_client() is first
+
+    github_client.reset_client()
+
+    assert github_client._get_client() is not first
+
+
+@pytest.mark.asyncio
+async def test_closed_client_is_replaced(monkeypatch):
+    """A client closed out from under us is rebuilt rather than reused."""
+    client = github_client._get_client()
+    await client.aclose()
+
+    assert github_client._get_client() is not client
