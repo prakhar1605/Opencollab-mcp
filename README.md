@@ -114,6 +114,8 @@ docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
 ```
 
 The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
+For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
+`0.0.0.0` and accept `PORT` (default `8000`).
 
 </details>
 
@@ -228,7 +230,7 @@ npx @modelcontextprotocol/inspector python -m opencollab_mcp
 
 ```
 src/opencollab_mcp/
-├── server.py          # entry point, transport selection (stdio / streamable-http)
+├── server.py          # entry point, transport selection (stdio / HTTP / SSE)
 ├── github_client.py   # cached httpx wrapper, friendly error mapping
 ├── helpers.py         # date math, base64 decode, issue-number parser
 ├── models.py          # Pydantic input models

@@ -35,7 +35,7 @@ async def _match_me(server, username: str) -> dict[str, Any]:
     result = server.call_tool("opencollab_match_me", {"params": {"username": username}})
     if hasattr(result, "__await__"):
         result = await result
-    text = result[0][0].text if isinstance(result, tuple) else result[0].text
+    text = result.content[0].text
     return json.loads(text)
 
 

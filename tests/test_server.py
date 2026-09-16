@@ -1,9 +1,4 @@
-"""Tests for the server entry point's transport selection.
-
-FastMCP.run() only accepts `transport` (and `mount_path`) — host/port must go
-through mcp.settings. These tests guard against regressing to run(host=, port=),
-which raises TypeError at startup and would break every remote deployment.
-"""
+"""Tests for MCPServer transport selection and network binding arguments."""
 
 from __future__ import annotations
 
@@ -27,15 +22,11 @@ def test_stdio_is_default(monkeypatch):
     assert calls == [((), {})]
 
 
-def test_streamable_http_configures_settings(monkeypatch):
+def test_streamable_http_passes_network_settings_to_run(monkeypatch):
     calls = _run_main_with(monkeypatch, {"TRANSPORT": "streamable-http", "PORT": "9001"})
-    assert calls == [((), {"transport": "streamable-http"})]
-    assert server.mcp.settings.host == "0.0.0.0"
-    assert server.mcp.settings.port == 9001
+    assert calls == [((), {"transport": "streamable-http", "host": "0.0.0.0", "port": 9001})]
 
 
-def test_sse_configures_settings(monkeypatch):
+def test_sse_passes_network_settings_to_run(monkeypatch):
     calls = _run_main_with(monkeypatch, {"TRANSPORT": "sse"})
-    assert calls == [((), {"transport": "sse"})]
-    assert server.mcp.settings.host == "0.0.0.0"
-    assert server.mcp.settings.port == 8000
+    assert calls == [((), {"transport": "sse", "host": "0.0.0.0", "port": 8000})]
