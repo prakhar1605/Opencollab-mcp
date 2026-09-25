@@ -70,6 +70,7 @@ def register(mcp: FastMCP) -> None:
             "total_found": result.get("total_count", 0),
             "language": params.language,
             "issues": issues,
+            "difficulty": params.difficulty,
         }, indent=2)
 
     @mcp.tool(
@@ -150,6 +151,7 @@ def register(mcp: FastMCP) -> None:
             "topics": sorted(topics_set)[:10],
             "matched_language": primary_lang,
             "matched_issues": issues,
+            "difficulty": params.difficulty,
         }
         if not language_detected:
             # Present only when the fallback fired, so its presence is the
