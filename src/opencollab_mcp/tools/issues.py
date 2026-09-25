@@ -128,11 +128,18 @@ def register(mcp: MCPServer) -> None:
         path = f"/repos/{params.owner}/{params.repo}"
 
         async def _try_contributing() -> str:
-            try:
-                contrib = await github_get(f"{path}/contents/CONTRIBUTING.md")
-                return decode_base64_content(contrib)[:2000]
-            except Exception:
-                return ""
+            locations = [
+                "CONTRIBUTING.md",
+                ".github/CONTRIBUTING.md",
+                "docs/CONTRIBUTING.md",
+            ]
+            for location in locations:
+                try:
+                    contrib = await github_get(f"{path}/contents/{location}")
+                    return decode_base64_content(contrib)[:2000]
+                except Exception:
+                    continue
+            return ""
 
         async def _try_root_dir() -> list[dict]:
             try:

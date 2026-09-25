@@ -136,3 +136,36 @@ async def test_find_issues_intermediate_uses_help_wanted(monkeypatch):
 
     assert 'label:"help wanted"' in captured_query
     assert 'label:"good first issue"' not in captured_query
+
+@pytest.mark.asyncio
+async def test_generate_pr_plan_finds_contributing_in_dot_github(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Test issue",
+            "body": "Test body",
+            "labels": [],
+            "state": "open",
+            "user": {"login": "tester"},
+            "comments": 0,
+        },
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {
+            "language": "Python",
+            "default_branch": "main",
+        },
+        "/repos/o/r/contents": [],
+        "/repos/o/r/contents/.github/CONTRIBUTING.md": {
+            "encoding": "base64",
+            "content": "VGVzdCBndWlkZWxpbmVz",
+        },
+    })
+    server = build_server()
+
+    result = await _call_tool_compat(
+        server,
+        "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    assert parsed["contributing_guidelines_preview"] == "Test guidelines"
