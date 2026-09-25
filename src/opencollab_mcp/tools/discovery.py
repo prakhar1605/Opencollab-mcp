@@ -102,6 +102,11 @@ def register(mcp: FastMCP) -> None:
         lang_bytes: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
+            # A fork's language is the upstream project's, not evidence of the
+            # user's own skills; forking a big C++ repo once would otherwise
+            # outweigh everything they actually wrote.
+            if repo.get("fork"):
+                continue
             lang = repo.get("language")
             if lang:
                 lang_bytes[lang] = lang_bytes.get(lang, 0) + repo.get("size", 0)
