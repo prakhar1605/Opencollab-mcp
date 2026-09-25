@@ -77,13 +77,21 @@ def register(mcp: MCPServer) -> None:
             )
             for event in timeline:
                 if event.get("event") == "cross-referenced":
-                    source = event.get("source", {}).get("issue", {})
-                    if source.get("pull_request"):
+                    source = event.get("source", {})
+                    issue_obj = source.get("issue", {}) if isinstance(source, dict) else {}
+                    pr_info = issue_obj.get("pull_request") if isinstance(issue_obj, dict) else None
+                    if pr_info is not None:
+                        merged = bool(pr_info.get("merged_at")) if isinstance(pr_info, dict) else False
                         linked_prs.append({
-                            "pr_number": source.get("number"),
-                            "title": source.get("title", ""),
-                            "state": source.get("state", "unknown"),
-                            "author": source.get("user", {}).get("login", "unknown"),
+                            "pr_number": issue_obj.get("number"),
+                            "title": issue_obj.get("title", ""),
+                            "state": issue_obj.get("state", "unknown"),
+                            "author": (
+                                issue_obj.get("user", {}).get("login", "unknown")
+                                if isinstance(issue_obj.get("user"), dict)
+                                else "unknown"
+                            ),
+                            "merged": merged,
                         })
         except Exception:
             pass
@@ -92,6 +100,14 @@ def register(mcp: MCPServer) -> None:
             return json.dumps({
                 "available": False,
                 "reason": "An open PR already exists for this issue",
+                "linked_prs": linked_prs,
+                "issue_title": issue.get("title", ""),
+            }, indent=2)
+
+        if any(pr.get("merged") for pr in linked_prs):
+            return json.dumps({
+                "available": False,
+                "reason": "A linked PR was already merged — the issue may already be fixed",
                 "linked_prs": linked_prs,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
