@@ -8,9 +8,15 @@ from pydantic import ValidationError
 from opencollab_mcp.models import (
     IssueInput,
     LanguageInput,
+    MatchMeInput,
     RepoInput,
     UsernameInput,
 )
+
+
+def test_match_me_rejects_path_characters():
+    with pytest.raises(ValidationError):
+        MatchMeInput(username="octo/cat")
 
 
 def test_username_strips_whitespace():

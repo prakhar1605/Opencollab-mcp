@@ -7,8 +7,6 @@ from datetime import datetime, timedelta, timezone
 
 
 def difficulty_label(difficulty: str) -> str:
-    if not difficulty:
-        return ""
     return 'label:"good first issue"' if difficulty == "beginner" else 'label:"help wanted"'
 
 
