@@ -90,3 +90,20 @@ async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search,
     assert payload["name"] == "Go Pher"
     assert payload["topics"] == ["cli"]
     assert payload["top_languages"] == [{"name": "Go", "percentage": 100.0}]
+
+
+@pytest.mark.asyncio
+async def test_match_me_ignores_forked_repos(server, no_search, mock_github):
+    # One big fork of a C++ project must not outweigh the user's own Rust.
+    mock_github({
+        "/users/rustacean": {"login": "rustacean"},
+        "/users/rustacean/repos": [
+            {"language": "C++", "size": 500_000, "fork": True, "topics": []},
+            {"language": "Rust", "size": 200, "fork": False, "topics": []},
+        ],
+    })
+
+    payload = await _match_me(server, "rustacean")
+
+    assert payload["matched_language"] == "Rust"
+    assert [lang["name"] for lang in payload["top_languages"]] == ["Rust"]

@@ -37,9 +37,21 @@ def register(mcp: MCPServer) -> None:
 
         path = f"/repos/{params.owner}/{params.repo}"
         try:
-            issue = await github_get(f"{path}/issues/{issue_num}")
+            # Availability is exactly the thing that changes between calls —
+            # someone gets assigned, a PR gets opened — so a cached copy up to
+            # five minutes old would report an issue as free after it was taken.
+            issue = await github_get(f"{path}/issues/{issue_num}", use_cache=False)
         except Exception as e:
             return handle_github_error(e)
+
+        # The issues endpoint also serves pull requests, which are not
+        # something to pick up and work on.
+        if issue.get("pull_request"):
+            return json.dumps({
+                "available": False,
+                "reason": f"#{issue_num} is a pull request, not an issue",
+                "issue_title": issue.get("title", ""),
+            }, indent=2)
 
         if issue.get("state") != "open":
             return json.dumps({
@@ -61,6 +73,7 @@ def register(mcp: MCPServer) -> None:
             timeline = await github_get(
                 f"{path}/issues/{issue_num}/timeline",
                 {"per_page": 50},
+                use_cache=False,
             )
             for event in timeline:
                 if event.get("event") == "cross-referenced":
