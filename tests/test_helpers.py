@@ -93,6 +93,18 @@ class TestParseIssueNumber:
         with pytest.raises(ValueError):
             parse_issue_number("-12")
 
+    @pytest.mark.parametrize("raw", ["0", "#0", "000"])
+    def test_zero_raises(self, raw):
+        # All digits, but GitHub issue numbers start at 1.
+        with pytest.raises(ValueError):
+            parse_issue_number(raw)
+
+    def test_non_ascii_digit_raises_value_error(self):
+        # '²'.isdigit() is True, but int('²') fails; it must still surface as
+        # the friendly ValueError, not slip through as an int.
+        with pytest.raises(ValueError):
+            parse_issue_number("12²")
+
 
 class TestDecodeBase64:
     def test_non_base64_returns_empty(self):

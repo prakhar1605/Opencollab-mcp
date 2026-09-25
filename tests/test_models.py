@@ -58,3 +58,39 @@ def test_issue_input_accepts_hashed_number():
 def test_language_input_required():
     with pytest.raises(ValidationError):
         LanguageInput()  # type: ignore
+
+
+@pytest.mark.parametrize("bad", ["octo/cat", "octo?x=1", "-octocat", "octo cat", "../x"])
+def test_username_rejects_path_characters(bad):
+    with pytest.raises(ValidationError):
+        UsernameInput(username=bad)
+
+
+@pytest.mark.parametrize("owner, repo", [
+    ("facebook", "react/issues"),
+    ("facebook", ".."),
+    ("facebook", "."),
+    ("face/book", "react"),
+    ("facebook", "react?x=1"),
+    ("facebook", "react#frag"),
+])
+def test_repo_input_rejects_path_characters(owner, repo):
+    with pytest.raises(ValidationError):
+        RepoInput(owner=owner, repo=repo)
+    with pytest.raises(ValidationError):
+        IssueInput(owner=owner, repo=repo, issue_number="1")
+
+
+@pytest.mark.parametrize("repo", ["react", "vscode-python", "next.js", "my_repo", ".github"])
+def test_repo_input_accepts_real_names(repo):
+    assert RepoInput(owner="some-org", repo=repo).repo == repo
+
+
+def test_language_rejects_double_quote():
+    with pytest.raises(ValidationError):
+        LanguageInput(language='Python" label:"bug')
+
+
+@pytest.mark.parametrize("lang", ["C++", "C#", "Jupyter Notebook", "F*"])
+def test_language_accepts_real_names(lang):
+    assert LanguageInput(language=lang).language == lang

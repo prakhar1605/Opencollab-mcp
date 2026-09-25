@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..constants import (
     HEALTH_VERDICT_EXCELLENT,
@@ -35,7 +35,7 @@ async def _community_profile_or_none(path: str) -> Any | None:
         raise
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_repo_health",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
@@ -16,7 +16,7 @@ def _bad_issue_number(raw: str, err: Exception) -> str:
     return json.dumps({"error": f"Invalid issue_number {raw!r}: {err}"}, indent=2)
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_check_issue_availability",
@@ -37,9 +37,21 @@ def register(mcp: FastMCP) -> None:
 
         path = f"/repos/{params.owner}/{params.repo}"
         try:
-            issue = await github_get(f"{path}/issues/{issue_num}")
+            # Availability is exactly the thing that changes between calls —
+            # someone gets assigned, a PR gets opened — so a cached copy up to
+            # five minutes old would report an issue as free after it was taken.
+            issue = await github_get(f"{path}/issues/{issue_num}", use_cache=False)
         except Exception as e:
             return handle_github_error(e)
+
+        # The issues endpoint also serves pull requests, which are not
+        # something to pick up and work on.
+        if issue.get("pull_request"):
+            return json.dumps({
+                "available": False,
+                "reason": f"#{issue_num} is a pull request, not an issue",
+                "issue_title": issue.get("title", ""),
+            }, indent=2)
 
         if issue.get("state") != "open":
             return json.dumps({
@@ -61,16 +73,25 @@ def register(mcp: FastMCP) -> None:
             timeline = await github_get(
                 f"{path}/issues/{issue_num}/timeline",
                 {"per_page": 50},
+                use_cache=False,
             )
             for event in timeline:
                 if event.get("event") == "cross-referenced":
-                    source = event.get("source", {}).get("issue", {})
-                    if source.get("pull_request"):
+                    source = event.get("source", {})
+                    issue_obj = source.get("issue", {}) if isinstance(source, dict) else {}
+                    pr_info = issue_obj.get("pull_request") if isinstance(issue_obj, dict) else None
+                    if pr_info is not None:
+                        merged = bool(pr_info.get("merged_at")) if isinstance(pr_info, dict) else False
                         linked_prs.append({
-                            "pr_number": source.get("number"),
-                            "title": source.get("title", ""),
-                            "state": source.get("state", "unknown"),
-                            "author": source.get("user", {}).get("login", "unknown"),
+                            "pr_number": issue_obj.get("number"),
+                            "title": issue_obj.get("title", ""),
+                            "state": issue_obj.get("state", "unknown"),
+                            "author": (
+                                issue_obj.get("user", {}).get("login", "unknown")
+                                if isinstance(issue_obj.get("user"), dict)
+                                else "unknown"
+                            ),
+                            "merged": merged,
                         })
         except Exception:
             pass
@@ -79,6 +100,14 @@ def register(mcp: FastMCP) -> None:
             return json.dumps({
                 "available": False,
                 "reason": "An open PR already exists for this issue",
+                "linked_prs": linked_prs,
+                "issue_title": issue.get("title", ""),
+            }, indent=2)
+
+        if any(pr.get("merged") for pr in linked_prs):
+            return json.dumps({
+                "available": False,
+                "reason": "A linked PR was already merged — the issue may already be fixed",
                 "linked_prs": linked_prs,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
@@ -115,11 +144,18 @@ def register(mcp: FastMCP) -> None:
         path = f"/repos/{params.owner}/{params.repo}"
 
         async def _try_contributing() -> str:
-            try:
-                contrib = await github_get(f"{path}/contents/CONTRIBUTING.md")
-                return decode_base64_content(contrib)[:2000]
-            except Exception:
-                return ""
+            locations = [
+                "CONTRIBUTING.md",
+                ".github/CONTRIBUTING.md",
+                "docs/CONTRIBUTING.md",
+            ]
+            for location in locations:
+                try:
+                    contrib = await github_get(f"{path}/contents/{location}")
+                    return decode_base64_content(contrib)[:2000]
+                except Exception:
+                    continue
+            return ""
 
         async def _try_root_dir() -> list[dict]:
             try:
