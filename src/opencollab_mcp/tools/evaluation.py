@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..constants import (
     HEALTH_VERDICT_EXCELLENT,
@@ -21,7 +21,7 @@ from ..helpers import days_ago
 from ..models import RepoInput
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_repo_health",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
@@ -16,7 +16,7 @@ def _bad_issue_number(raw: str, err: Exception) -> str:
     return json.dumps({"error": f"Invalid issue_number {raw!r}: {err}"}, indent=2)
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_check_issue_availability",

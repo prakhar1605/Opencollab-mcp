@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
@@ -13,7 +13,7 @@ from ..helpers import days_ago, recent_date_str, truncate
 from ..models import LanguageInput, UsernameInput
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_find_issues",
