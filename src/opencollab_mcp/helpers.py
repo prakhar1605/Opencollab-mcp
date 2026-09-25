@@ -41,7 +41,10 @@ def parse_issue_number(raw: str) -> int:
     Accepts '123', '#123', ' 123 '. Raises ValueError otherwise.
     """
     cleaned = raw.strip().lstrip("#").strip()
-    if not cleaned.isdigit():
+    # isascii() because str.isdigit() also accepts characters like '²' that
+    # int() then rejects; the explicit zero check because '0' is all digits
+    # but GitHub issue numbers start at 1.
+    if not (cleaned.isascii() and cleaned.isdigit()) or int(cleaned) == 0:
         raise ValueError(f"issue_number must be a positive integer, got {raw!r}")
     return int(cleaned)
 
