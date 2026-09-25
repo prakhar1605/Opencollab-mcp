@@ -124,6 +124,24 @@ async def test_find_issues_intermediate_keeps_quoting_and_is_issue(server, captu
     assert 'label:"help wanted"' in query
     assert "is:issue" in query.split()
 
+@pytest.mark.asyncio
+async def test_match_me_intermediate_sends_help_wanted(server, captured_queries, mock_github):
+    mock_github({
+                "/users/gopher": {"login": "gopher"},
+                "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+            })
+    
+    await _call(
+        server,
+        "opencollab_match_me",
+        {"params": {"username": "gopher", "difficulty": "intermediate"}},
+    )
+
+    query = captured_queries[0]
+    assert 'label:"help wanted"' in query
+    assert 'label:"good first issue"' not in query
+    assert "is:issue" in query.split()
+
 
 @pytest.mark.asyncio
 async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, mock_github):
