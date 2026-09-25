@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 
 from ..constants import (
@@ -19,6 +21,18 @@ from ..constants import (
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago
 from ..models import RepoInput
+
+
+async def _community_profile_or_none(path: str) -> Any | None:
+    """Return community metadata when available, without hiding rate limits."""
+    try:
+        return await github_get(f"{path}/community/profile")
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        rate_limited = status == 403 and exc.response.headers.get("x-ratelimit-remaining") == "0"
+        if status == 404 or (status == 403 and not rate_limited):
+            return None
+        raise
 
 
 def register(mcp: FastMCP) -> None:
@@ -42,7 +56,7 @@ def register(mcp: FastMCP) -> None:
             repo, pulls, community = await asyncio.gather(
                 github_get(path),
                 github_get(f"{path}/pulls", {"state": "closed", "per_page": 30, "sort": "updated"}),
-                github_get(f"{path}/community/profile"),
+                _community_profile_or_none(path),
             )
         except Exception as e:
             return handle_github_error(e)
@@ -77,6 +91,7 @@ def register(mcp: FastMCP) -> None:
         details["open_issues"] = open_issues
 
         files_info = community.get("files", {}) if isinstance(community, dict) else {}
+        details["community_profile_available"] = community is not None
         community_files = {
             "contributing": files_info.get("contributing") is not None,
             "code_of_conduct": files_info.get("code_of_conduct") is not None,
