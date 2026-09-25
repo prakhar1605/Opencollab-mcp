@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, recent_date_str, truncate
+from ..helpers import days_ago, recent_date_str, truncate, difficulty_label
 from ..models import LanguageInput, UsernameInput
 
 
@@ -30,7 +30,7 @@ def register(mcp: FastMCP) -> None:
         issues from public repos.
         """
         since = recent_date_str(RECENT_ISSUES_DAYS)
-        label = 'label:"good first issue"' if params.difficulty == "beginner" else 'label:"help wanted"'
+        label = difficulty_label(params.difficulty)
         query_parts = [
             # The language is quoted so multi-word values survive: bare
             # `language:Jupyter Notebook` is parsed by GitHub as
