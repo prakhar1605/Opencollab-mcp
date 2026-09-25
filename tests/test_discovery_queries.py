@@ -130,7 +130,7 @@ async def test_match_me_intermediate_sends_help_wanted(server, captured_queries,
                 "/users/gopher": {"login": "gopher"},
                 "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
             })
-    
+
     await _call(
         server,
         "opencollab_match_me",

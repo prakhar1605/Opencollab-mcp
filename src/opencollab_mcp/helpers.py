@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64 as _base64
 from datetime import datetime, timedelta, timezone
 
+
 def difficulty_label(difficulty: str) -> str:
     if not difficulty:
         return ""

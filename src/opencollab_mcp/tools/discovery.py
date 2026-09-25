@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, recent_date_str, truncate, difficulty_label
+from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
 
