@@ -62,3 +62,90 @@ async def test_availability_is_not_served_from_cache(mock_github):
 
     assert payload["available"] is False
     assert "fast-dev" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_merged_pull_request_marks_issue_unavailable(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 9,
+                        "state": "closed",
+                        "title": "Fix bug",
+                        "pull_request": {"merged_at": "2026-01-01T00:00:00Z"},
+                        "user": {"login": "dev1"},
+                    }
+                },
+            }
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "already merged" in payload["reason"]
+    assert len(payload["linked_prs"]) == 1
+    assert payload["linked_prs"][0]["merged"] is True
+    assert payload["linked_prs"][0]["pr_number"] == 9
+
+
+@pytest.mark.asyncio
+async def test_closed_unmerged_pull_request_leaves_issue_available(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 10,
+                        "state": "closed",
+                        "title": "Abandoned fix",
+                        "pull_request": {"merged_at": None},
+                        "user": {"login": "dev2"},
+                    }
+                },
+            }
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert len(payload["linked_prs"]) == 1
+    assert payload["linked_prs"][0]["merged"] is False
+    assert payload["linked_prs"][0]["pr_number"] == 10
+
+
+@pytest.mark.asyncio
+async def test_open_pull_request_marks_issue_unavailable_and_records_merged_false(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 11,
+                        "state": "open",
+                        "title": "WIP PR",
+                        "pull_request": {},
+                        "user": {"login": "dev3"},
+                    }
+                },
+            }
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "open PR" in payload["reason"]
+    assert len(payload["linked_prs"]) == 1
+    assert payload["linked_prs"][0]["merged"] is False
+    assert payload["linked_prs"][0]["pr_number"] == 11
+
