@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
 from ..helpers import days_ago, recent_date_str, truncate, difficulty_label
-from ..models import LanguageInput, UsernameInput
+from ..models import LanguageInput, MatchMeInput
 
 
 def register(mcp: FastMCP) -> None:
@@ -80,7 +80,7 @@ def register(mcp: FastMCP) -> None:
             "idempotentHint": True, "openWorldHint": True,
         },
     )
-    async def opencollab_match_me(params: UsernameInput) -> str:
+    async def opencollab_match_me(params: MatchMeInput) -> str:
         """All-in-one: analyze a GitHub profile and instantly find issues
         matched to that user's top skills.
 
@@ -120,10 +120,12 @@ def register(mcp: FastMCP) -> None:
         language_detected = bool(top_langs)
         primary_lang = top_langs[0][0] if language_detected else "Python"
         since = recent_date_str(RECENT_ISSUES_DAYS)
+        label = difficulty_label(params.difficulty)
+
         try:
             result = await github_search(
                 "issues",
-                f'language:"{primary_lang}" label:"good first issue" state:open '
+                f'language:"{primary_lang}" {label} state:open '
                 f'is:issue created:>{since} is:public',
                 {"sort": "created", "order": "desc", "per_page": 10},
             )

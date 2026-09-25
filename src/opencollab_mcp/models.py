@@ -11,6 +11,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class MatchMeInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    username: str = Field(..., description="GitHub username", min_length=1, max_length=39)
+    difficulty: Literal["beginner", "intermediate"] = Field(
+        default="beginner",
+        description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"'
+)
+
+
 class UsernameInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     username: str = Field(..., description="GitHub username", min_length=1, max_length=39)
