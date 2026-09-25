@@ -17,7 +17,13 @@ async def _check(issue_number: str = "7") -> dict[str, Any]:
     )
     if hasattr(result, "__await__"):
         result = await result
-    text = result[0][0].text if isinstance(result, tuple) else result[0].text
+    # mcp 1.x returns (content, structured) or a content list; 2.x returns a
+    # CallToolResult with .content.
+    if hasattr(result, "content"):
+        result = result.content
+    elif isinstance(result, tuple):
+        result = result[0]
+    text = result[0].text
     return json.loads(text)
 
 
