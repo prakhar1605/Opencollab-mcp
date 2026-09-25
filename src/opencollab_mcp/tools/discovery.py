@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
@@ -13,7 +13,7 @@ from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         name="opencollab_find_issues",
@@ -103,6 +103,11 @@ def register(mcp: FastMCP) -> None:
         lang_bytes: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
+            # A fork's language is the upstream project's, not evidence of the
+            # user's own skills; forking a big C++ repo once would otherwise
+            # outweigh everything they actually wrote.
+            if repo.get("fork"):
+                continue
             lang = repo.get("language")
             if lang:
                 lang_bytes[lang] = lang_bytes.get(lang, 0) + repo.get("size", 0)

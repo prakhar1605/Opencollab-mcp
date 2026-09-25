@@ -28,7 +28,7 @@ EXPECTED_TOOL_NAMES = {
 
 
 async def _list_tools_compat(server):
-    """FastMCP's list_tools() may be sync or async depending on SDK version."""
+    """MCPServer's list_tools() may be sync or async across SDK versions."""
     result = server.list_tools()
     if hasattr(result, "__await__"):
         result = await result
@@ -36,7 +36,7 @@ async def _list_tools_compat(server):
 
 
 async def _call_tool_compat(server, name: str, arguments: dict):
-    """FastMCP's call_tool() may be sync or async depending on SDK version."""
+    """MCPServer's call_tool() may be sync or async across SDK versions."""
     result = server.call_tool(name, arguments)
     if hasattr(result, "__await__"):
         result = await result
@@ -44,18 +44,8 @@ async def _call_tool_compat(server, name: str, arguments: dict):
 
 
 def _extract_text(result) -> str:
-    """Pull JSON text out of a FastMCP tool result, regardless of return shape."""
-    if isinstance(result, tuple):
-        result = result[0]
-    if isinstance(result, list) and result:
-        first = result[0]
-        if hasattr(first, "text"):
-            return first.text
-        if isinstance(first, dict) and "text" in first:
-            return first["text"]
-    if hasattr(result, "text"):
-        return result.text
-    return str(result)
+    """Pull JSON text from the MCP 2.x CallToolResult envelope."""
+    return result.content[0].text
 
 
 @pytest.mark.asyncio
@@ -146,3 +136,36 @@ async def test_find_issues_intermediate_uses_help_wanted(monkeypatch):
 
     assert 'label:"help wanted"' in captured_query
     assert 'label:"good first issue"' not in captured_query
+
+@pytest.mark.asyncio
+async def test_generate_pr_plan_finds_contributing_in_dot_github(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Test issue",
+            "body": "Test body",
+            "labels": [],
+            "state": "open",
+            "user": {"login": "tester"},
+            "comments": 0,
+        },
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {
+            "language": "Python",
+            "default_branch": "main",
+        },
+        "/repos/o/r/contents": [],
+        "/repos/o/r/contents/.github/CONTRIBUTING.md": {
+            "encoding": "base64",
+            "content": "VGVzdCBndWlkZWxpbmVz",
+        },
+    })
+    server = build_server()
+
+    result = await _call_tool_compat(
+        server,
+        "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    assert parsed["contributing_guidelines_preview"] == "Test guidelines"
