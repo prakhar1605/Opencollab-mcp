@@ -6,6 +6,10 @@ import base64 as _base64
 from datetime import datetime, timedelta, timezone
 
 
+def difficulty_label(difficulty: str) -> str:
+    return 'label:"good first issue"' if difficulty == "beginner" else 'label:"help wanted"'
+
+
 def days_ago(iso_str: str | None) -> int | None:
     """Days between an ISO timestamp and now (UTC). None if unparseable."""
     if not iso_str:

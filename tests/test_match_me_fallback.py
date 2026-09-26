@@ -85,7 +85,7 @@ async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search,
 
     assert set(payload) == {
         "username", "name", "top_languages", "topics",
-        "matched_language", "matched_issues",
+        "matched_language", "matched_issues", "difficulty"
     }
     assert payload["name"] == "Go Pher"
     assert payload["topics"] == ["cli"]
