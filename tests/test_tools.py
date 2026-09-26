@@ -105,6 +105,55 @@ async def test_impact_estimator_massive_stars(mock_github):
 
 
 @pytest.mark.asyncio
+async def test_repo_health_scores_when_community_profile_is_not_found(mock_github):
+    """A missing community profile should not hide the rest of the health score."""
+    mock_github({
+        "/repos/o/r": {
+            "pushed_at": "2026-09-25T00:00:00Z",
+            "stargazers_count": 20,
+            "open_issues_count": 7,
+            "forks_count": 5,
+            "description": "A small project",
+            "topics": ["python"],
+        },
+        "/repos/o/r/pulls": [],
+        # The missing community-profile route returns the fixture's default 404.
+    })
+    server = build_server()
+
+    result = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    assert isinstance(parsed["health_score"], int)
+    assert parsed["details"]["community_profile_available"] is False
+    assert not any(parsed["details"]["community_files"].values())
+
+
+@pytest.mark.asyncio
+async def test_repo_health_scores_when_community_profile_is_forbidden(mock_github):
+    mock_github({
+        "/repos/o/r": {},
+        "/repos/o/r/pulls": [],
+        "/repos/o/r/community/profile": (403, {"message": "Resource not accessible"}),
+    })
+    server = build_server()
+
+    result = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    assert isinstance(parsed["health_score"], int)
+    assert parsed["details"]["community_profile_available"] is False
+
+
+@pytest.mark.asyncio
 async def test_check_issue_availability_invalid_number(mock_github):
     """The tool should return a friendly error JSON, not raise."""
     server = build_server()
