@@ -84,3 +84,10 @@ class LanguageInput(BaseModel):
         default="beginner",
         description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
     )
+
+    limit: int = Field(
+        default=15,
+        description="Max number of issues to return (1-30)",
+        ge=1,
+        le=30,
+    )

@@ -26,8 +26,8 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_find_issues(params: LanguageInput) -> str:
         """Find open-source issues by language and difficulty.
         Beginner searches use the "good first issue" label, while intermediate
-        searches use the "help wanted" label. Returns up to 15 recently created
-        issues from public repos.
+        searches use the "help wanted" label. Returns up to `limit` (default 15,
+        max 30) recently created issues from public repos.
         """
         since = recent_date_str(RECENT_ISSUES_DAYS)
         label = 'label:"good first issue"' if params.difficulty == "beginner" else 'label:"help wanted"'
@@ -48,7 +48,7 @@ def register(mcp: MCPServer) -> None:
             result = await github_search(
                 "issues",
                 " ".join(query_parts),
-                {"sort": "created", "order": "desc", "per_page": 15},
+                {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)
