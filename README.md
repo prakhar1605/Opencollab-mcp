@@ -152,7 +152,7 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns 10 matching good-first-issues — all in one call. |
-| `opencollab_find_issues` | Up to 15 recent issues for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
+| `opencollab_find_issues` | Up to 15 recent issues (adjustable with `limit`, 1–30) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
 
 </details>
 

@@ -139,3 +139,32 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert "created:>" in query
+
+
+# ---- limit (#16) -----------------------------------------------------------
+
+@pytest.fixture
+def captured_params(monkeypatch) -> list[dict[str, Any]]:
+    """Record the request params the discovery tools send to GitHub search."""
+    calls: list[dict[str, Any]] = []
+
+    async def _fake_search(endpoint: str, query: str, params: dict[str, Any] | None = None):
+        calls.append(params or {})
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", _fake_search)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_find_issues_defaults_to_15_per_page(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    assert captured_params[0]["per_page"] == 15
+
+
+@pytest.mark.asyncio
+async def test_find_issues_passes_limit_as_per_page(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python", "limit": 3}})
+
+    assert captured_params[0]["per_page"] == 3

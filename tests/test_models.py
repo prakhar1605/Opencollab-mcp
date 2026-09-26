@@ -94,3 +94,18 @@ def test_language_rejects_double_quote():
 @pytest.mark.parametrize("lang", ["C++", "C#", "Jupyter Notebook", "F*"])
 def test_language_accepts_real_names(lang):
     assert LanguageInput(language=lang).language == lang
+
+
+def test_language_input_limit_defaults_to_15():
+    assert LanguageInput(language="Python").limit == 15
+
+
+@pytest.mark.parametrize("limit", [1, 30])
+def test_language_input_accepts_limit_bounds(limit):
+    assert LanguageInput(language="Python", limit=limit).limit == limit
+
+
+@pytest.mark.parametrize("limit", [0, -1, 31])
+def test_language_input_rejects_out_of_range_limit(limit):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", limit=limit)
