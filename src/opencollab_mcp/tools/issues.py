@@ -69,10 +69,11 @@ def register(mcp: MCPServer) -> None:
             }, indent=2)
 
         linked_prs: list[dict] = []
+        linked_prs_checked = True
         try:
             timeline = await github_get(
                 f"{path}/issues/{issue_num}/timeline",
-                {"per_page": 50},
+                {"per_page": 100},
                 use_cache=False,
             )
             for event in timeline:
@@ -94,13 +95,16 @@ def register(mcp: MCPServer) -> None:
                             "merged": merged,
                         })
         except Exception:
-            pass
+            # Without the timeline we can't tell whether a PR is already open,
+            # so say so instead of reporting "no open PRs".
+            linked_prs_checked = False
 
         if any(pr.get("state") == "open" for pr in linked_prs):
             return json.dumps({
                 "available": False,
                 "reason": "An open PR already exists for this issue",
                 "linked_prs": linked_prs,
+                "linked_prs_checked": linked_prs_checked,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
@@ -109,16 +113,25 @@ def register(mcp: MCPServer) -> None:
                 "available": False,
                 "reason": "A linked PR was already merged — the issue may already be fixed",
                 "linked_prs": linked_prs,
+                "linked_prs_checked": linked_prs_checked,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
+        if linked_prs_checked:
+            reason = "No assignees, no open PRs — go for it!"
+        else:
+            reason = (
+                "No assignees, but linked PRs could not be checked "
+                "(timeline request failed) — look for an open PR before starting"
+            )
         return json.dumps({
             "available": True,
-            "reason": "No assignees, no open PRs — go for it!",
+            "reason": reason,
             "issue_title": issue.get("title", ""),
             "labels": [lb.get("name", "") for lb in issue.get("labels", [])],
             "comments": issue.get("comments", 0),
             "linked_prs": linked_prs,
+            "linked_prs_checked": linked_prs_checked,
             "created_days_ago": days_ago(issue.get("created_at")),
         }, indent=2)
 

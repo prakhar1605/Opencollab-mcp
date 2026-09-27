@@ -149,3 +149,31 @@ async def test_open_pull_request_marks_issue_unavailable_and_records_merged_fals
     assert payload["linked_prs"][0]["merged"] is False
     assert payload["linked_prs"][0]["pr_number"] == 11
 
+
+
+@pytest.mark.asyncio
+async def test_timeline_failure_is_reported_not_hidden(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": (500, {}),
+    })
+
+    payload = await _check()
+
+    assert payload["linked_prs_checked"] is False
+    assert payload["linked_prs"] == []
+    assert "no open PRs" not in payload["reason"]
+    assert "could not be checked" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_timeline_success_marks_linked_prs_checked(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["linked_prs_checked"] is True
