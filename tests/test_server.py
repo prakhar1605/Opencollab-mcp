@@ -9,7 +9,7 @@ def _run_main_with(monkeypatch, env: dict[str, str]):
     """Run server.main() with a patched mcp.run, returning the calls it made."""
     calls = []
     monkeypatch.setattr(server.mcp, "run", lambda *a, **kw: calls.append((a, kw)))
-    for key in ("TRANSPORT", "PORT"):
+    for key in ("TRANSPORT", "PORT", "HOST"):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -30,3 +30,16 @@ def test_streamable_http_passes_network_settings_to_run(monkeypatch):
 def test_sse_passes_network_settings_to_run(monkeypatch):
     calls = _run_main_with(monkeypatch, {"TRANSPORT": "sse"})
     assert calls == [((), {"transport": "sse", "host": "0.0.0.0", "port": 8000})]
+
+
+def test_host_env_reaches_run(monkeypatch):
+    calls = _run_main_with(
+        monkeypatch,
+        {"TRANSPORT": "streamable-http", "HOST": "127.0.0.1", "PORT": "9001"},
+    )
+    assert calls == [((), {"transport": "streamable-http", "host": "127.0.0.1", "port": 9001})]
+
+
+def test_host_env_reaches_sse_run(monkeypatch):
+    calls = _run_main_with(monkeypatch, {"TRANSPORT": "sse", "HOST": "127.0.0.1"})
+    assert calls == [((), {"transport": "sse", "host": "127.0.0.1", "port": 8000})]

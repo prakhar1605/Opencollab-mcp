@@ -4,7 +4,7 @@ Slim entry point. All 6 tools live in src/opencollab_mcp/tools/, organized
 by category to match the three sections in the README.
 
 Supports STDIO (local), streamable-HTTP, and legacy SSE (remote) transports.
-Set TRANSPORT and optionally PORT=8000 for remote deployment.
+Set TRANSPORT and optionally HOST / PORT for remote deployment.
 """
 
 from __future__ import annotations
@@ -53,14 +53,18 @@ def main() -> None:
     logger = logging.getLogger("opencollab_mcp")
 
     if transport in ("streamable-http", "http"):
+        # Default 0.0.0.0 keeps existing Docker / remote deployments unchanged.
+        # Set HOST=127.0.0.1 to bind only to loopback on a local machine.
+        host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "8000"))
-        logger.info("Starting OpenCollab MCP on streamable-http (port %d)", port)
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+        logger.info("Starting OpenCollab MCP on streamable-http (%s:%d)", host, port)
+        mcp.run(transport="streamable-http", host=host, port=port)
     elif transport == "sse":
         # Legacy SSE transport — kept for backwards compatibility.
+        host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "8000"))
-        logger.info("Starting OpenCollab MCP on SSE (port %d)", port)
-        mcp.run(transport="sse", host="0.0.0.0", port=port)
+        logger.info("Starting OpenCollab MCP on SSE (%s:%d)", host, port)
+        mcp.run(transport="sse", host=host, port=port)
     else:
         logger.info("Starting OpenCollab MCP on stdio")
         mcp.run()
