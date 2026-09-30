@@ -9,6 +9,7 @@ Set TRANSPORT and optionally PORT=8000 for remote deployment.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 
@@ -47,7 +48,19 @@ def build_server() -> MCPServer:
 mcp = build_server()
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="opencollab-mcp",
+        description="OpenCollab MCP Server — AI-powered open source contribution matchmaker.",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.parse_known_args(argv)
+
     _configure_logging()
     transport = os.environ.get("TRANSPORT", "stdio").lower()
     logger = logging.getLogger("opencollab_mcp")

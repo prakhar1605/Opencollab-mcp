@@ -247,6 +247,13 @@ tests/                 # pytest suite
 
 Issues and PRs are welcome. The codebase is small (~1000 lines) and intentionally easy to read. Every scoring threshold lives in `constants.py` so tuning is a one-line change. New tools follow the same pattern: a function in `tools/<category>.py`, a Pydantic input model in `models.py`, and a test in `tests/test_tools.py`.
 
+When reporting bugs or submitting issues, please include the version of `opencollab-mcp` you are running (especially when using `uvx` caches):
+
+```bash
+opencollab-mcp --version
+```
+*(or `opencollab-mcp -V`)*
+
 The `main` branch is protected — please open a PR rather than pushing directly. CI runs on Python 3.10, 3.11, and 3.12.
 
 ---
