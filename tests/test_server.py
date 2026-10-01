@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 
 import pytest
@@ -36,6 +37,27 @@ def test_streamable_http_passes_network_settings_to_run(monkeypatch):
 def test_sse_passes_network_settings_to_run(monkeypatch):
     calls = _run_main_with(monkeypatch, {"TRANSPORT": "sse"})
     assert calls == [((), {"transport": "sse", "host": "0.0.0.0", "port": 8000})]
+
+
+@pytest.mark.parametrize("port", ["abc", "8000/tcp", "0", "65536"])
+def test_invalid_port_exits_cleanly(monkeypatch, capsys, port):
+    with pytest.raises(SystemExit) as excinfo:
+        _run_main_with(monkeypatch, {"TRANSPORT": "streamable-http", "PORT": port})
+    assert excinfo.value.code == (
+        f"Error: PORT must be a number between 1 and 65535, got {port!r}"
+    )
+    assert capsys.readouterr().out == ""
+
+
+def test_unknown_log_level_warns_and_uses_info(monkeypatch, caplog):
+    levels = []
+    monkeypatch.setattr(logging, "basicConfig", lambda **kw: levels.append(kw["level"]))
+    monkeypatch.setenv("OPENCOLLAB_LOG_LEVEL", "DEBUGG")
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
+        _run_main_with(monkeypatch, {})
+    assert levels == [logging.INFO]
+    assert "Unknown OPENCOLLAB_LOG_LEVEL 'DEBUGG'" in caplog.text
+    assert "DEBUG, INFO, WARNING, ERROR, CRITICAL" in caplog.text
 
 
 def test_version_flag_prints_version_and_exits(monkeypatch, capsys):
