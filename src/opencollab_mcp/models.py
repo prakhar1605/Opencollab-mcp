@@ -66,15 +66,19 @@ class IssueInput(BaseModel):
         ..., description="Repository name", min_length=1, max_length=100,
         pattern=REPO_NAME_PATTERN,
     )
-    # Kept as str on purpose — many LLM clients pass numbers as strings,
-    # and we run a permissive parser (handles '#123', '123', ' 123 ').
+    # Normalize JSON integers to the string parser's existing input format.
     issue_number: str = Field(
         ...,
-        description="Issue number (e.g. '123' or '#123')",
+        description="Issue number (e.g. 123, '123' or '#123')",
         min_length=1,
     )
 
     _check_repo = field_validator("repo")(_reject_dot_segments)
+
+    @field_validator("issue_number", mode="before")
+    @classmethod
+    def normalize_issue_number(cls, value: object) -> object:
+        return str(value) if type(value) is int else value
 
 
 class LanguageInput(BaseModel):
