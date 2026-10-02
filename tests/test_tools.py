@@ -154,13 +154,17 @@ async def test_repo_health_scores_when_community_profile_is_forbidden(mock_githu
 
 
 @pytest.mark.asyncio
-async def test_check_issue_availability_invalid_number(mock_github):
+@pytest.mark.parametrize("number", ["not-a-number", 0, -5])
+@pytest.mark.parametrize("tool", [
+    "opencollab_check_issue_availability", "opencollab_generate_pr_plan",
+])
+async def test_check_issue_availability_invalid_number(mock_github, number, tool):
     """The tool should return a friendly error JSON, not raise."""
     server = build_server()
     result = await _call_tool_compat(
         server,
-        "opencollab_check_issue_availability",
-        {"params": {"owner": "x", "repo": "y", "issue_number": "not-a-number"}},
+        tool,
+        {"params": {"owner": "x", "repo": "y", "issue_number": number}},
     )
     parsed = json.loads(_extract_text(result))
     assert "error" in parsed

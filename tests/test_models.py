@@ -61,6 +61,18 @@ def test_issue_input_accepts_hashed_number():
     assert m.issue_number == "#456"
 
 
+@pytest.mark.parametrize("number", [123, 0, -5])
+def test_issue_input_normalizes_integer(number):
+    m = IssueInput(owner="x", repo="y", issue_number=number)
+    assert m.issue_number == str(number)
+
+
+@pytest.mark.parametrize("number", [True, False, 1.5, 123.0])
+def test_issue_input_rejects_non_integer_numbers(number):
+    with pytest.raises(ValidationError):
+        IssueInput(owner="x", repo="y", issue_number=number)
+
+
 def test_language_input_required():
     with pytest.raises(ValidationError):
         LanguageInput()  # type: ignore
