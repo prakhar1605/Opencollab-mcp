@@ -134,6 +134,44 @@ async def test_repo_health_scores_when_community_profile_is_not_found(mock_githu
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("archived", [True, False, None])
+@pytest.mark.parametrize("merged", [False, True])
+async def test_repo_health_reports_archived_status(mock_github, archived, merged):
+    repo = {
+        "stargazers_count": 1000,
+        "forks_count": 100,
+        "open_issues_count": 10,
+        "description": "A popular project",
+        "topics": ["python"],
+    }
+    if archived is not None:
+        repo["archived"] = archived
+    mock_github({
+        "/repos/o/r": repo,
+        "/repos/o/r/pulls": [{"merged_at": "2026-10-01T00:00:00Z"}] if merged else [],
+        "/repos/o/r/community/profile": {
+            "files": {key: {} for key in [
+                "contributing", "code_of_conduct", "license", "readme", "issue_template",
+            ]},
+        },
+    })
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+    parsed = json.loads(_extract_text(result))
+    assert parsed["health_score"] == (80 if merged else 60)
+    assert parsed["details"]["archived"] is (archived is True)
+    if archived:
+        assert parsed["verdict"] == "Archived — read-only, cannot accept contributions"
+    elif merged:
+        assert parsed["verdict"] == "Excellent — very contributor-friendly"
+    else:
+        assert parsed["verdict"] == "Good — solid project to contribute to"
+
+
+@pytest.mark.asyncio
 async def test_repo_health_scores_when_community_profile_is_forbidden(mock_github):
     mock_github({
         "/repos/o/r": {},

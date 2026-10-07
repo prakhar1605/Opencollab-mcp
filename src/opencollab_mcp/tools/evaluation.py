@@ -50,6 +50,7 @@ def register(mcp: MCPServer) -> None:
 
         Checks activity recency, community size, PR merge patterns, open
         issues, and whether the repo has essential contributor files.
+        Archived repositories receive a read-only verdict regardless of score.
         """
         path = f"/repos/{params.owner}/{params.repo}"
         try:
@@ -62,7 +63,7 @@ def register(mcp: MCPServer) -> None:
             return handle_github_error(e)
 
         score = 0
-        details: dict[str, object] = {}
+        details: dict[str, object] = {"archived": bool(repo.get("archived", False))}
 
         last_push_days = days_ago(repo.get("pushed_at"))
         if last_push_days is not None:
@@ -112,7 +113,9 @@ def register(mcp: MCPServer) -> None:
         elif forks >= 5: score += 3
         score = min(score, 100)
 
-        if score >= HEALTH_VERDICT_EXCELLENT:
+        if details["archived"]:
+            verdict = "Archived — read-only, cannot accept contributions"
+        elif score >= HEALTH_VERDICT_EXCELLENT:
             verdict = "Excellent — very contributor-friendly"
         elif score >= HEALTH_VERDICT_GOOD:
             verdict = "Good — solid project to contribute to"
