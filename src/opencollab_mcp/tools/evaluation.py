@@ -142,8 +142,8 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_impact_estimator(params: RepoInput) -> str:
         """Estimate the impact of contributing to a specific repository.
 
-        Produces an impact tier (MASSIVE/HIGH/MEDIUM/LOW) and a suggested
-        resume line.
+        Produces an impact tier and a suggested resume line for active repositories.
+        Archived repositories are flagged as read-only and receive no resume line.
         """
         path = f"/repos/{params.owner}/{params.repo}"
         try:
@@ -156,6 +156,7 @@ def register(mcp: MCPServer) -> None:
         watchers = repo.get("subscribers_count", 0)
         open_issues = repo.get("open_issues_count", 0)
         description = repo.get("description") or ""
+        archived = bool(repo.get("archived", False))
 
         if stars >= IMPACT_MASSIVE_STARS:
             tier, reach = "MASSIVE", "millions of developers"
@@ -169,7 +170,9 @@ def register(mcp: MCPServer) -> None:
             tier, reach = "LOW", "a growing community"
 
         repo_name = f"{params.owner}/{params.repo}"
-        if stars >= IMPACT_MEDIUM_STARS:
+        if archived:
+            resume_line = None
+        elif stars >= IMPACT_MEDIUM_STARS:
             resume_line = f"Contributed to {repo_name} ({stars:,}+ stars), reaching {reach}"
         else:
             resume_line = f"Open-source contributor to {repo_name} — {description[:80]}"
@@ -183,8 +186,9 @@ def register(mcp: MCPServer) -> None:
             100,
         )
 
-        return json.dumps({
+        result = {
             "repo": repo_name,
+            "archived": archived,
             "impact_tier": tier,
             "estimated_reach": reach,
             "stars": stars,
@@ -194,4 +198,7 @@ def register(mcp: MCPServer) -> None:
             "visibility_score": visibility,
             "suggested_resume_line": resume_line,
             "topics": repo.get("topics", []),
-        }, indent=2)
+        }
+        if archived:
+            result["note"] = "Archived — read-only, new contributions are not possible"
+        return json.dumps(result, indent=2)
