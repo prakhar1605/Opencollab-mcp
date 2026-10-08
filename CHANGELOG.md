@@ -15,6 +15,8 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- Troubleshooting section in the README ([#89](https://github.com/prakhar1605/Opencollab-mcp/pull/89))
+- CI builds the package and smoke-tests the installed CLI ([#90](https://github.com/prakhar1605/Opencollab-mcp/pull/90))
 - `limit` parameter (1–30) for `opencollab_find_issues` ([#42](https://github.com/prakhar1605/Opencollab-mcp/pull/42))
 - `--version` and `-V` command-line flags ([#51](https://github.com/prakhar1605/Opencollab-mcp/pull/51))
 - `/health` endpoint, plus cache TTL and eviction tests ([#44](https://github.com/prakhar1605/Opencollab-mcp/pull/44))
