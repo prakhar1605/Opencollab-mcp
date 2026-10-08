@@ -105,6 +105,60 @@ async def test_impact_estimator_massive_stars(mock_github):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("archived", [True, False, None])
+@pytest.mark.parametrize("stars,tier,reach,visibility", [
+    (5, "LOW", "a growing community", 42),
+    (100, "MODERATE", "hundreds of developers", 42),
+    (1_000, "MEDIUM", "thousands of developers", 44),
+    (10_000, "HIGH", "tens of thousands of developers", 62),
+    (60_000, "MASSIVE", "millions of developers", 82),
+])
+async def test_impact_estimator_reports_archived_status(
+    mock_github, archived, stars, tier, reach, visibility,
+):
+    repo = {
+        "stargazers_count": stars,
+        "forks_count": 200,
+        "subscribers_count": 1_000,
+        "open_issues_count": 20,
+        "description": "A useful library",
+        "topics": ["python"],
+    }
+    if archived is not None:
+        repo["archived"] = archived
+    mock_github({"/repos/o/r": repo})
+
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+    parsed = json.loads(_extract_text(result))
+
+    if archived:
+        assert parsed.get("suggested_resume_line") is None
+        assert parsed["note"] == "Archived — read-only, new contributions are not possible"
+    else:
+        if stars >= 1_000:
+            expected_resume = f"Contributed to o/r ({stars:,}+ stars), reaching {reach}"
+        else:
+            expected_resume = "Open-source contributor to o/r — A useful library"
+        assert parsed["suggested_resume_line"] == expected_resume
+        assert "note" not in parsed
+
+    assert parsed["archived"] is (archived is True)
+    assert parsed["repo"] == "o/r"
+    assert parsed["impact_tier"] == tier
+    assert parsed["estimated_reach"] == reach
+    assert parsed["stars"] == stars
+    assert parsed["forks"] == 200
+    assert parsed["watchers"] == 1_000
+    assert parsed["open_issues"] == 20
+    assert parsed["topics"] == ["python"]
+    assert parsed["visibility_score"] == visibility
+
+
+@pytest.mark.asyncio
 async def test_repo_health_scores_when_community_profile_is_not_found(mock_github):
     """A missing community profile should not hide the rest of the health score."""
     mock_github({
