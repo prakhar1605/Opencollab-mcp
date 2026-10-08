@@ -85,8 +85,8 @@ def register(mcp: MCPServer) -> None:
         """All-in-one: analyze a GitHub profile and instantly find issues
         matched to that user's top skills.
 
-        Detects the user's primary language and returns 10 matching
-        good-first-issues.
+        Detects the user's primary language and returns up to `limit`
+        (default 10, max 30) matching issues.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -133,7 +133,7 @@ def register(mcp: MCPServer) -> None:
                 "issues",
                 f'language:"{primary_lang}" {label} state:open '
                 f'is:issue created:>{since} is:public',
-                {"sort": "created", "order": "desc", "per_page": 10},
+                {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)

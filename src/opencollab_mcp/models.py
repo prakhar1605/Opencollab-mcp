@@ -32,6 +32,12 @@ class MatchMeInput(BaseModel):
         default="beginner",
         description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
     )
+    limit: int = Field(
+        default=10,
+        description="Max number of issues to return (1-30)",
+        ge=1,
+        le=30,
+    )
 
 
 class UsernameInput(BaseModel):
