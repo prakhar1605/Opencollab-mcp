@@ -165,7 +165,7 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
-| `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
+| `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. Archived repos are flagged read-only and get no resume line. |
 
 </details>
 
@@ -272,7 +272,7 @@ Already shipped (v0.6.0):
 - Stdio (local) and streamable-HTTP (remote) transports
 - Branch protection + required CI checks on `main`
 
-Merged since v0.6.1 (see the [Changelog](CHANGELOG.md)):
+Added in v0.7.0 (see the [Changelog](CHANGELOG.md)):
 
 - Migrated to the MCP 2.x server API
 - `GET /health` endpoint for the HTTP transports, used by the Docker `HEALTHCHECK`
