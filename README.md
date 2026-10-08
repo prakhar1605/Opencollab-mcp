@@ -118,6 +118,7 @@ docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
 The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
 For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
+`GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
 
 </details>
 
@@ -153,7 +154,7 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns 10 matching good-first-issues — all in one call. |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns 10 matching issues — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
 | `opencollab_find_issues` | Up to 15 recent issues (adjustable with `limit`, 1–30) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
 
 </details>
@@ -163,7 +164,7 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. |
+| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
 | `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
 
 </details>
@@ -173,8 +174,8 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has a PR? Checks the timeline so you don't waste a weekend. |
-| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, and repo layout for the AI to plan a fix. |
+| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
+| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
 
 </details>
 
@@ -270,6 +271,12 @@ Already shipped (v0.6.0):
 - pytest suite on Python 3.10/3.11/3.12 in CI
 - Stdio (local) and streamable-HTTP (remote) transports
 - Branch protection + required CI checks on `main`
+
+Merged since v0.6.1 (see the [Changelog](CHANGELOG.md)):
+
+- Migrated to the MCP 2.x server API
+- `GET /health` endpoint for the HTTP transports, used by the Docker `HEALTHCHECK`
+- Validated tool inputs: GitHub usernames, repo names and issue numbers are checked before any request
 
 Open ideas:
 
