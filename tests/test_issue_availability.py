@@ -177,3 +177,36 @@ async def test_timeline_success_marks_linked_prs_checked(mock_github):
 
     assert payload["available"] is True
     assert payload["linked_prs_checked"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lock_reason", ["resolved", None])
+async def test_locked_issue_is_not_available(mock_github, lock_reason):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "state": "open", "title": "Locked bug", "assignees": [],
+            "locked": True, "active_lock_reason": lock_reason,
+        },
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "locked" in payload["reason"]
+    assert payload["issue_title"] == "Locked bug"
+    if lock_reason:
+        assert payload["active_lock_reason"] == lock_reason
+
+
+@pytest.mark.asyncio
+async def test_unlocked_issue_with_old_lock_reason_is_available(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "state": "open", "title": "Bug", "assignees": [],
+            "locked": False, "active_lock_reason": "resolved",
+        },
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    assert (await _check())["available"] is True
