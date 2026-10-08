@@ -208,6 +208,62 @@ Scopes needed: just `public_repo`. OpenCollab never writes anything — it's all
 
 ---
 
+## Troubleshooting
+
+### Which version am I running?
+
+```bash
+opencollab-mcp --version   # or: opencollab-mcp -V
+```
+
+Include this output when you report a bug. If the flag isn't recognised, you're on an older release; upgrade (see the next item).
+
+### `uvx` keeps running an old version
+
+`uvx` caches packages, so it can keep using a stale copy. Force the newest release with either:
+
+```bash
+uvx --refresh opencollab-mcp
+uvx opencollab-mcp@latest
+```
+
+In an MCP client config, use `"args": ["--refresh", "opencollab-mcp"]` (or `"opencollab-mcp@latest"`).
+
+### Rate-limit errors
+
+Symptom: a tool returns
+
+```
+Error: GitHub API rate limit exceeded. Resets in ~N minutes. Set GITHUB_TOKEN for a 5,000 requests/hour limit.
+```
+
+Fix: set `GITHUB_TOKEN` (see [Authentication & rate limits](#authentication--rate-limits)). Without a token you get 60 requests/hour; with one, 5,000. If the token is already set, restart your MCP client so it picks up the environment variable.
+
+### Docker container shows "unhealthy"
+
+The health check calls `/health` on `PORT` inside the container. Check that:
+
+1. `PORT` matches the port you publish. If you set `-e PORT=9000`, publish `-p 9000:9000`.
+2. `/health` responds:
+
+   ```bash
+   curl localhost:8000/health   # expected output: ok
+   ```
+
+3. The container is running in HTTP mode (`TRANSPORT=streamable-http`, the image default). In `stdio` mode there is no `/health` endpoint.
+
+### Where are the logs?
+
+Logs go to **stderr** (stdout is reserved for the MCP protocol in stdio mode). For more detail, set `OPENCOLLAB_LOG_LEVEL`:
+
+```bash
+OPENCOLLAB_LOG_LEVEL=DEBUG opencollab-mcp
+```
+
+Valid levels: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`. In Docker, read them with `docker logs <container>`. Most MCP clients also keep a per-server log; check your client's MCP log viewer.
+
+---
+
 ## Develop
 
 ```bash
