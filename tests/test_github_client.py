@@ -309,3 +309,13 @@ def test_cache_evicts_oldest_when_full(monkeypatch):
     assert "key1" not in github_client._cache, "oldest-expiry entry should be evicted"
     assert "key2" in github_client._cache
     assert "key3" in github_client._cache
+
+
+def test_get_headers_strips_trailing_whitespace_from_token(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "  ghp_abc\n")
+    assert github_client._get_headers()["Authorization"] == "Bearer ghp_abc"
+
+
+def test_get_headers_treats_whitespace_only_token_as_no_token(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "   ")
+    assert "Authorization" not in github_client._get_headers()
