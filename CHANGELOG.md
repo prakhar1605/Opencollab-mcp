@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- `limit` parameter (1–30) for `opencollab_match_me` ([#121](https://github.com/prakhar1605/Opencollab-mcp/pull/121))
 - Troubleshooting section in the README ([#89](https://github.com/prakhar1605/Opencollab-mcp/pull/89))
 - CI builds the package and smoke-tests the installed CLI ([#90](https://github.com/prakhar1605/Opencollab-mcp/pull/90))
 - `limit` parameter (1–30) for `opencollab_find_issues` ([#42](https://github.com/prakhar1605/Opencollab-mcp/pull/42))
@@ -24,6 +25,8 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 
 ### Changed
+- `opencollab_match_me` picks the top language by number of repositories, not repository disk size ([#125](https://github.com/prakhar1605/Opencollab-mcp/pull/125))
+- Unknown command-line arguments are reported with a warning instead of being silently ignored ([#126](https://github.com/prakhar1605/Opencollab-mcp/pull/126))
 - README tool table, Docker notes and roadmap brought up to date ([#87](https://github.com/prakhar1605/Opencollab-mcp/pull/87))
 - Migrated to the MCP 2.x server API, replacing the temporary `mcp<2` pin ([#30](https://github.com/prakhar1605/Opencollab-mcp/pull/30), [#28](https://github.com/prakhar1605/Opencollab-mcp/pull/28))
 - Reuse one `httpx.AsyncClient` instead of creating one per request ([#24](https://github.com/prakhar1605/Opencollab-mcp/pull/24))
@@ -32,6 +35,10 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Whitespace around `GITHUB_TOKEN` (e.g. a trailing newline) no longer breaks every request ([#123](https://github.com/prakhar1605/Opencollab-mcp/pull/123))
+- GitHub 422 validation errors are shown as a readable message instead of raw JSON ([#128](https://github.com/prakhar1605/Opencollab-mcp/pull/128))
+- `check_issue_availability` marks locked issues as unavailable ([#124](https://github.com/prakhar1605/Opencollab-mcp/pull/124))
+- `repo_health` handles repositories with Issues disabled ([#127](https://github.com/prakhar1605/Opencollab-mcp/pull/127))
 - `impact_estimator` flags archived repositories and gives them no resume line ([#88](https://github.com/prakhar1605/Opencollab-mcp/pull/88))
 - `repo_health` flags archived repositories as read-only ([#78](https://github.com/prakhar1605/Opencollab-mcp/pull/78))
 - `generate_pr_plan` rejects pull request numbers ([#77](https://github.com/prakhar1605/Opencollab-mcp/pull/77))
