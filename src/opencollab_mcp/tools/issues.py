@@ -68,6 +68,16 @@ def register(mcp: MCPServer) -> None:
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
+        if issue.get("locked"):
+            payload = {
+                "available": False,
+                "reason": "Issue is locked — only maintainers can comment",
+                "issue_title": issue.get("title", ""),
+            }
+            if issue.get("active_lock_reason"):
+                payload["active_lock_reason"] = issue["active_lock_reason"]
+            return json.dumps(payload, indent=2)
+
         linked_prs: list[dict] = []
         linked_prs_checked = True
         try:

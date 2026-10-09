@@ -226,6 +226,36 @@ async def test_repo_health_reports_archived_status(mock_github, archived, merged
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("has_issues", [True, False, None])
+@pytest.mark.parametrize("open_count, issue_points", [(0, 0), (2, 5), (10, 10), (501, 5)])
+async def test_repo_health_accounts_for_disabled_issues(
+    mock_github, has_issues, open_count, issue_points,
+):
+    repo = {"stargazers_count": 10, "open_issues_count": open_count}
+    if has_issues is not None:
+        repo["has_issues"] = has_issues
+    mock_github({
+        "/repos/o/r": repo,
+        "/repos/o/r/pulls": [],
+        "/repos/o/r/community/profile": {"files": {}},
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+    parsed = json.loads(_extract_text(result))
+    enabled = has_issues is not False
+    assert parsed["details"]["has_issues"] is enabled
+    assert parsed["health_score"] == 5 + (issue_points if enabled else 0)
+    assert parsed["details"]["open_issues"] == (open_count if enabled else 0)
+    if enabled:
+        assert "issues_note" not in parsed["details"]
+    else:
+        assert "Issues are disabled" in parsed["details"]["issues_note"]
+        assert "README" in parsed["details"]["issues_note"]
+
+
+@pytest.mark.asyncio
 async def test_repo_health_scores_when_community_profile_is_forbidden(mock_github):
     mock_github({
         "/repos/o/r": {},

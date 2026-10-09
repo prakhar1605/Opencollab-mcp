@@ -86,7 +86,14 @@ def register(mcp: MCPServer) -> None:
         elif merge_rate > 0: score += 5
         details["pr_merge_rate_pct"] = merge_rate
 
-        open_issues = repo.get("open_issues_count", 0)
+        has_issues = bool(repo.get("has_issues", True))
+        details["has_issues"] = has_issues
+        # With Issues disabled, GitHub's combined count contains only PRs.
+        open_issues = repo.get("open_issues_count", 0) if has_issues else 0
+        if not has_issues:
+            details["issues_note"] = (
+                "Issues are disabled on GitHub — check the README for where this project tracks work"
+            )
         if 5 <= open_issues <= 500: score += 10
         elif open_issues > 0: score += 5
         details["open_issues"] = open_issues

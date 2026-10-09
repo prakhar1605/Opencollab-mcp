@@ -187,3 +187,27 @@ async def test_find_issues_passes_limit_as_per_page(server, captured_params):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Python", "limit": 3}})
 
     assert captured_params[0]["per_page"] == 3
+
+
+@pytest.mark.asyncio
+async def test_match_me_defaults_to_10_per_page(server, captured_params, mock_github):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher"}})
+
+    assert captured_params[0]["per_page"] == 10
+
+
+@pytest.mark.asyncio
+async def test_match_me_passes_limit_as_per_page(server, captured_params, mock_github):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher", "limit": 5}})
+
+    assert captured_params[0]["per_page"] == 5

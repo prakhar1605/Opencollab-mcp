@@ -85,8 +85,8 @@ def register(mcp: MCPServer) -> None:
         """All-in-one: analyze a GitHub profile and instantly find issues
         matched to that user's top skills.
 
-        Detects the user's primary language and returns 10 matching
-        good-first-issues.
+        Detects the user's primary language and returns up to `limit`
+        (default 10, max 30) matching issues.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -100,7 +100,7 @@ def register(mcp: MCPServer) -> None:
         except Exception as e:
             return handle_github_error(e)
 
-        lang_bytes: dict[str, int] = {}
+        lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
             # A fork's language is the upstream project's, not evidence of the
@@ -110,15 +110,15 @@ def register(mcp: MCPServer) -> None:
                 continue
             lang = repo.get("language")
             if lang:
-                lang_bytes[lang] = lang_bytes.get(lang, 0) + repo.get("size", 0)
+                lang_repos[lang] = lang_repos.get(lang, 0) + 1
             for t in repo.get("topics", []):
                 topics_set.add(t)
 
-        total = max(sum(lang_bytes.values()), 1)
-        top_langs = sorted(lang_bytes.items(), key=lambda x: x[1], reverse=True)[:3]
+        total = max(sum(lang_repos.values()), 1)
+        top_langs = sorted(lang_repos.items(), key=lambda x: x[1], reverse=True)[:3]
         languages = [
-            {"name": n, "percentage": round(b / total * 100, 1)}
-            for n, b in top_langs
+            {"name": name, "percentage": round(count / total * 100, 1)}
+            for name, count in top_langs
         ]
         # A profile with no owned repo carrying language data — a brand-new
         # account, a fork-only account, an org-only contributor — would
@@ -133,7 +133,7 @@ def register(mcp: MCPServer) -> None:
                 "issues",
                 f'language:"{primary_lang}" {label} state:open '
                 f'is:issue created:>{since} is:public',
-                {"sort": "created", "order": "desc", "per_page": 10},
+                {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)

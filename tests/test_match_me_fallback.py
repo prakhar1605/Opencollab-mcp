@@ -107,3 +107,43 @@ async def test_match_me_ignores_forked_repos(server, no_search, mock_github):
 
     assert payload["matched_language"] == "Rust"
     assert [lang["name"] for lang in payload["top_languages"]] == ["Rust"]
+
+
+@pytest.mark.asyncio
+async def test_match_me_counts_owned_repositories_not_disk_size(
+    server, no_search, mock_github, monkeypatch
+):
+    repos = [
+        {"language": "Python", "size": 500_000, "fork": False, "topics": []},
+        *[
+            {"language": "TypeScript", "size": 100, "fork": False, "topics": []}
+            for _ in range(5)
+        ],
+        {"language": None, "size": 10_000, "fork": False, "topics": []},
+        {"language": "C++", "size": 900_000, "fork": True, "topics": []},
+    ]
+    mock_github({"/users/dev": {"login": "dev"}, "/users/dev/repos": repos})
+
+    calls = {"get": 0, "search": 0}
+    original_get = discovery.github_get
+    original_search = discovery.github_search
+
+    async def counted_get(*args, **kwargs):
+        calls["get"] += 1
+        return await original_get(*args, **kwargs)
+
+    async def counted_search(*args, **kwargs):
+        calls["search"] += 1
+        return await original_search(*args, **kwargs)
+
+    monkeypatch.setattr(discovery, "github_get", counted_get)
+    monkeypatch.setattr(discovery, "github_search", counted_search)
+
+    payload = await _match_me(server, "dev")
+
+    assert payload["matched_language"] == "TypeScript"
+    assert payload["top_languages"] == [
+        {"name": "TypeScript", "percentage": 83.3},
+        {"name": "Python", "percentage": 16.7},
+    ]
+    assert calls == {"get": 2, "search": 1}

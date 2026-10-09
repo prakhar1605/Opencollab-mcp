@@ -127,3 +127,18 @@ def test_language_input_accepts_limit_bounds(limit):
 def test_language_input_rejects_out_of_range_limit(limit):
     with pytest.raises(ValidationError):
         LanguageInput(language="Python", limit=limit)
+
+
+def test_match_me_input_limit_defaults_to_10():
+    assert MatchMeInput(username="octocat").limit == 10
+
+
+@pytest.mark.parametrize("limit", [1, 30])
+def test_match_me_input_accepts_limit_bounds(limit):
+    assert MatchMeInput(username="octocat", limit=limit).limit == limit
+
+
+@pytest.mark.parametrize("limit", [0, -1, 31])
+def test_match_me_input_rejects_out_of_range_limit(limit):
+    with pytest.raises(ValidationError):
+        MatchMeInput(username="octocat", limit=limit)
