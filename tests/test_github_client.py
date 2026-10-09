@@ -151,6 +151,36 @@ def test_handle_github_error_timeout():
     assert "timed out" in msg.lower()
 
 
+@pytest.mark.parametrize("errors, detail", [
+    ([{"message": "The requested repositories cannot be searched."}],
+     ": The requested repositories cannot be searched."),
+    ([{"message": "First error"}, {"message": "Second error"}], ": First error"),
+    ([], ""),
+    ([{"code": "invalid"}], ""),
+    (["invalid"], ""),
+    (None, ""),
+])
+def test_handle_github_error_422_formats_json(errors, detail):
+    request = httpx.Request("GET", "https://api.github.com/search/issues")
+    response = httpx.Response(
+        422, request=request, json={"message": "Validation Failed", "errors": errors},
+    )
+    err = httpx.HTTPStatusError("validation", request=request, response=response)
+    assert github_client.handle_github_error(err) == (
+        f"Error: GitHub rejected the request — Validation Failed{detail}"
+    )
+
+
+@pytest.mark.parametrize("body", ["invalid query " * 30, "[]", '{"errors": []}'])
+def test_handle_github_error_422_preserves_raw_fallback(body):
+    request = httpx.Request("GET", "https://api.github.com/search/issues")
+    response = httpx.Response(422, request=request, text=body)
+    err = httpx.HTTPStatusError("validation", request=request, response=response)
+    assert github_client.handle_github_error(err) == (
+        f"Error: GitHub rejected the request — {body[:200]}"
+    )
+
+
 def test_handle_github_error_unknown():
     msg = github_client.handle_github_error(RuntimeError("boom"))
     assert "RuntimeError" in msg

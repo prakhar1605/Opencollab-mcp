@@ -177,6 +177,25 @@ def _reset_hint(response: httpx.Response) -> str:
     return f" Resets in ~{round(seconds / 60)} minutes."
 
 
+def _validation_message(response: httpx.Response) -> str:
+    fallback = response.text[:200]
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback
+    if not isinstance(payload, dict):
+        return fallback
+    message = payload.get("message")
+    if not isinstance(message, str) or not message:
+        return fallback
+    errors = payload.get("errors")
+    if isinstance(errors, list) and errors and isinstance(errors[0], dict):
+        detail = errors[0].get("message")
+        if isinstance(detail, str) and detail:
+            return f"{message}: {detail}"
+    return message
+
+
 def handle_github_error(e: Exception) -> str:
     """Return a human-friendly error string for GitHub API failures.
 
@@ -206,7 +225,7 @@ def handle_github_error(e: Exception) -> str:
         if code == 404:
             return "Error: Resource not found on GitHub. Double-check the username or repo name."
         if code == 422:
-            return f"Error: GitHub rejected the request — {e.response.text[:200]}"
+            return f"Error: GitHub rejected the request — {_validation_message(e.response)}"
         return f"Error: GitHub API returned status {code}."
     if isinstance(e, httpx.TimeoutException):
         return "Error: GitHub API request timed out. Please try again."
