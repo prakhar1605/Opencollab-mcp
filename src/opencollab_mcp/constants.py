@@ -21,6 +21,7 @@ GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
 USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"
+GITHUB_RATE_LIMIT_WARNING_THRESHOLD = 10
 
 # ---- Caching ----
 # Short-lived cache to soften GitHub rate-limit pressure for repeat lookups
