@@ -47,6 +47,9 @@ opencollab-mcp = "opencollab_mcp.server:main"
 Homepage = "https://github.com/prakhar1605/Opencollab-mcp"
 Repository = "https://github.com/prakhar1605/Opencollab-mcp"
 Issues = "https://github.com/prakhar1605/Opencollab-mcp/issues"
+Changelog = "https://github.com/prakhar1605/Opencollab-mcp/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/prakhar1605/Opencollab-mcp#readme"
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/opencollab_mcp"]
