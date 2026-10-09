@@ -35,6 +35,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- `check_issue_availability` reports `wontfix`/`duplicate`/`invalid` issues as unavailable and warns on `blocked`/`needs-triage` labels ([#142](https://github.com/prakhar1605/Opencollab-mcp/pull/142))
 - Whitespace around `GITHUB_TOKEN` (e.g. a trailing newline) no longer breaks every request ([#123](https://github.com/prakhar1605/Opencollab-mcp/pull/123))
 - GitHub 422 validation errors are shown as a readable message instead of raw JSON ([#128](https://github.com/prakhar1605/Opencollab-mcp/pull/128))
 - `check_issue_availability` marks locked issues as unavailable ([#124](https://github.com/prakhar1605/Opencollab-mcp/pull/124))
