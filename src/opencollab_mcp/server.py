@@ -78,11 +78,17 @@ def main(argv: list[str] | None = None) -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    parser.parse_known_args(argv)
+    _, unknown_args = parser.parse_known_args(argv)
 
     _configure_logging()
     transport = os.environ.get("TRANSPORT", "stdio").lower()
     logger = logging.getLogger("opencollab_mcp")
+    if unknown_args:
+        logger.warning(
+            "Ignoring unknown arguments: %s. Configure the server with environment "
+            "variables (TRANSPORT, PORT); see the README.",
+            " ".join(unknown_args),
+        )
 
     if transport in ("streamable-http", "http"):
         port = _read_port()

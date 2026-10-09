@@ -11,7 +11,7 @@ from opencollab_mcp import server
 from opencollab_mcp.constants import __version__
 
 
-def _run_main_with(monkeypatch, env: dict[str, str]):
+def _run_main_with(monkeypatch, env: dict[str, str], argv: list[str] | None = None):
     """Run server.main() with a patched mcp.run, returning the calls it made."""
     calls = []
     monkeypatch.setattr(server.mcp, "run", lambda *a, **kw: calls.append((a, kw)))
@@ -20,13 +20,29 @@ def _run_main_with(monkeypatch, env: dict[str, str]):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    server.main()
+    server.main(argv)
     return calls
 
 
 def test_stdio_is_default(monkeypatch):
     calls = _run_main_with(monkeypatch, {})
     assert calls == [((), {})]
+
+
+@pytest.mark.parametrize("argv", [["--port", "9000"], ["--transport", "sse"]])
+def test_unknown_arguments_warn_without_stopping_stdio(monkeypatch, caplog, capsys, argv):
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
+        calls = _run_main_with(monkeypatch, {}, argv)
+    assert calls == [((), {})]
+    assert f"Ignoring unknown arguments: {' '.join(argv)}" in caplog.text
+    assert "TRANSPORT, PORT" in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+def test_no_unknown_arguments_does_not_warn(monkeypatch, caplog):
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
+        _run_main_with(monkeypatch, {}, [])
+    assert "Ignoring unknown arguments" not in caplog.text
 
 
 def test_streamable_http_passes_network_settings_to_run(monkeypatch):
