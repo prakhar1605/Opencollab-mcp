@@ -28,6 +28,20 @@ GITHUB_API_VERSION = "2022-11-28"
 CACHE_TTL_SECONDS = 300  # 5 minutes
 CACHE_MAX_ENTRIES = 256
 
+# ---- Issue labels that mean "don't start yet" ----
+# Compared case-insensitively, with "-" and "_" treated as spaces, so
+# "needs-triage", "Needs Triage" and "needs_triage" all match.
+# Blocking: the maintainers have already decided the issue won't be fixed as
+# written, so a PR for it is wasted work.
+BLOCKING_ISSUE_LABELS = frozenset({"wontfix", "won't fix", "duplicate", "invalid"})
+# Warning: the work may still happen, but not before a maintainer weighs in.
+WARNING_ISSUE_LABELS = frozenset({
+    "blocked",
+    "needs triage",
+    "needs discussion",
+    "on hold",
+})
+
 # ---- Search windows (days) ----
 RECENT_ISSUES_DAYS = 90
 

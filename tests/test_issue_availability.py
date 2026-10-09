@@ -210,3 +210,53 @@ async def test_unlocked_issue_with_old_lock_reason_is_available(mock_github):
     })
 
     assert (await _check())["available"] is True
+
+
+def _labelled_issue(*names: str) -> dict[str, Any]:
+    return {
+        "state": "open", "title": "Bug", "assignees": [],
+        "labels": [{"name": n} for n in names],
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("label", ["wontfix", "Duplicate", "invalid"])
+async def test_blocking_label_marks_issue_unavailable(mock_github, label):
+    mock_github({
+        "/repos/o/r/issues/7": _labelled_issue("bug", label),
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert label in payload["reason"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("label", ["needs-triage", "Needs Discussion", "on hold", "blocked"])
+async def test_warning_label_keeps_issue_available_with_warning(mock_github, label):
+    mock_github({
+        "/repos/o/r/issues/7": _labelled_issue("good first issue", label),
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert "ask a maintainer" in payload["reason"]
+    assert payload["warning_labels"] == [label]
+
+
+@pytest.mark.asyncio
+async def test_plain_good_first_issue_has_no_warning(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": _labelled_issue("good first issue"),
+        "/repos/o/r/issues/7/timeline": [],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["reason"] == "No assignees, no open PRs — go for it!"
+    assert "warning_labels" not in payload
