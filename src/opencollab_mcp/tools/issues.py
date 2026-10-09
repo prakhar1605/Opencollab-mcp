@@ -7,6 +7,7 @@ import json
 
 from mcp.server.mcpserver import MCPServer
 
+from ..constants import BLOCKING_ISSUE_LABELS, WARNING_ISSUE_LABELS
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
 from ..models import IssueInput
@@ -14,6 +15,10 @@ from ..models import IssueInput
 
 def _bad_issue_number(raw: str, err: Exception) -> str:
     return json.dumps({"error": f"Invalid issue_number {raw!r}: {err}"}, indent=2)
+
+
+def _normalize_label(name: str) -> str:
+    return " ".join(name.lower().replace("-", " ").replace("_", " ").split())
 
 
 def register(mcp: MCPServer) -> None:
@@ -28,7 +33,8 @@ def register(mcp: MCPServer) -> None:
     )
     async def opencollab_check_issue_availability(params: IssueInput) -> str:
         """Check if a GitHub issue is still available — no one has claimed
-        it or opened a PR for it. Checks assignees and linked pull requests.
+        it or opened a PR for it. Checks assignees, linked pull requests and
+        labels such as `wontfix` or `needs-triage`.
         """
         try:
             issue_num = parse_issue_number(params.issue_number)
@@ -127,23 +133,41 @@ def register(mcp: MCPServer) -> None:
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
-        if linked_prs_checked:
+        labels = [lb.get("name", "") for lb in issue.get("labels", [])]
+        blocking = [lb for lb in labels if _normalize_label(lb) in BLOCKING_ISSUE_LABELS]
+        if blocking:
+            return json.dumps({
+                "available": False,
+                "reason": f"Labelled {blocking[0]!r} — maintainers don't plan to take a fix",
+                "issue_title": issue.get("title", ""),
+                "labels": labels,
+            }, indent=2)
+        warning_labels = [lb for lb in labels if _normalize_label(lb) in WARNING_ISSUE_LABELS]
+
+        if warning_labels:
+            reason = f"Labelled {warning_labels[0]!r} — ask a maintainer before starting"
+            if not linked_prs_checked:
+                reason += " (linked PRs could not be checked either)"
+        elif linked_prs_checked:
             reason = "No assignees, no open PRs — go for it!"
         else:
             reason = (
                 "No assignees, but linked PRs could not be checked "
                 "(timeline request failed) — look for an open PR before starting"
             )
-        return json.dumps({
+        payload = {
             "available": True,
             "reason": reason,
             "issue_title": issue.get("title", ""),
-            "labels": [lb.get("name", "") for lb in issue.get("labels", [])],
+            "labels": labels,
             "comments": issue.get("comments", 0),
             "linked_prs": linked_prs,
             "linked_prs_checked": linked_prs_checked,
             "created_days_ago": days_ago(issue.get("created_at")),
-        }, indent=2)
+        }
+        if warning_labels:
+            payload["warning_labels"] = warning_labels
+        return json.dumps(payload, indent=2)
 
     @mcp.tool(
         name="opencollab_generate_pr_plan",
