@@ -22,11 +22,13 @@ from .constants import (
     DEFAULT_TIMEOUT,
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
+    GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
     USER_AGENT,
 )
 
 logger = logging.getLogger("opencollab_mcp.github")
 
+_rate_limit_warned = False
 
 # ---- in-memory TTL cache --------------------------------------------------
 
@@ -132,13 +134,15 @@ async def github_get(
         params=params or {},
     )
 
+    resp.raise_for_status()
+    _check_rate_limit(resp)
+
     # GitHub returns 202 with empty body while it computes statistics
     # (commit_activity, participation, contributors on cold repos).
     if resp.status_code == 202:
         logger.info("GitHub returned 202 (stats computing) for %s", path)
         return {}
 
-    resp.raise_for_status()
     try:
         data = resp.json()
     except ValueError:
@@ -178,6 +182,29 @@ def _reset_hint(response: httpx.Response) -> str:
     if seconds < 60:
         return " Resets in under a minute."
     return f" Resets in ~{round(seconds / 60)} minutes."
+
+
+def _check_rate_limit(response: httpx.Response) -> None:
+    """Log a warning when GitHub API quota is running low."""
+    global _rate_limit_warned
+    header_value = response.headers.get("x-ratelimit-remaining")
+    if header_value is None:
+        return
+    try:
+        remaining = int(header_value)
+    except (ValueError, TypeError):
+        return
+    if remaining >= GITHUB_RATE_LIMIT_WARNING_THRESHOLD:
+        _rate_limit_warned = False
+        return
+    if not _rate_limit_warned:
+        logger.warning(
+            "GitHub API quota is running low (%s requests remaining).%s"
+            "Set GITHUB_TOKEN for a 5,000 requests/hour limit.",
+            remaining,
+            _reset_hint(response)
+        )
+        _rate_limit_warned = True
 
 
 def _validation_message(response: httpx.Response) -> str:
