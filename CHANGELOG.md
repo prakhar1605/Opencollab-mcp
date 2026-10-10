@@ -15,6 +15,8 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- `SECURITY.md` with a vulnerability reporting policy ([#145](https://github.com/prakhar1605/Opencollab-mcp/pull/145))
+- A warning is logged when the GitHub API rate limit is low ([#144](https://github.com/prakhar1605/Opencollab-mcp/pull/144))
 - `limit` parameter (1–30) for `opencollab_match_me` ([#121](https://github.com/prakhar1605/Opencollab-mcp/pull/121))
 - Troubleshooting section in the README ([#89](https://github.com/prakhar1605/Opencollab-mcp/pull/89))
 - CI builds the package and smoke-tests the installed CLI ([#90](https://github.com/prakhar1605/Opencollab-mcp/pull/90))
@@ -25,6 +27,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 
 ### Changed
+- `repo_health` scoring thresholds moved to named constants in `constants.py`, behaviour unchanged ([#146](https://github.com/prakhar1605/Opencollab-mcp/pull/146))
 - PyPI project page links to the changelog and documentation ([#143](https://github.com/prakhar1605/Opencollab-mcp/pull/143))
 - `opencollab_match_me` picks the top language by number of repositories, not repository disk size ([#125](https://github.com/prakhar1605/Opencollab-mcp/pull/125))
 - Unknown command-line arguments are reported with a warning instead of being silently ignored ([#126](https://github.com/prakhar1605/Opencollab-mcp/pull/126))
