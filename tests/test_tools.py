@@ -276,6 +276,74 @@ async def test_repo_health_scores_when_community_profile_is_forbidden(mock_githu
 
 
 @pytest.mark.asyncio
+async def test_repo_health_score_calculation(mock_github):
+    """Verify repo_health scoring on an active repo and an abandoned repo."""
+    mock_github({
+        "/repos/active/project": {
+            "pushed_at": "2026-10-09T00:00:00Z",  # <= 7 days: +20
+            "stargazers_count": 1500,  # >= 1000: +15
+            "forks_count": 150,  # >= 100: +10
+            "open_issues_count": 50,  # 5..500: +10
+            "has_issues": True,
+            "description": "An active open-source project",  # +2
+            "topics": ["python", "ai"],  # +3
+            "archived": False,
+        },
+        "/repos/active/project/pulls": [
+            {"merged_at": "2026-10-08T00:00:00Z"},
+            {"merged_at": "2026-10-07T00:00:00Z"},
+        ],  # 2/2 merged = 100% (>= 60): +20
+        "/repos/active/project/community/profile": {
+            "files": {
+                "contributing": {},
+                "code_of_conduct": {},
+                "license": {},
+                "readme": {},
+                "issue_template": {},
+                "pull_request_template": {},
+            },  # 6 * 4 = 24 capped at 20: +20
+        },
+        "/repos/abandoned/project": {
+            "pushed_at": "2020-01-01T00:00:00Z",  # > 90 days: +0
+            "stargazers_count": 2,  # < 10: +0
+            "forks_count": 1,  # < 5: +0
+            "open_issues_count": 0,  # 0: +0
+            "has_issues": True,
+            "description": None,  # +0
+            "topics": [],  # +0
+            "archived": False,
+        },
+        "/repos/abandoned/project/pulls": [
+            {"merged_at": None},
+        ],  # 0% merge rate: +0
+        "/repos/abandoned/project/community/profile": {
+            "files": {},  # 0 files: +0
+        },
+    })
+    server = build_server()
+
+    # Active repo: 20 (push) + 15 (stars) + 20 (merge) + 10 (issues) + 20 (files) + 2 (desc) + 3 (topics) + 10 (forks) = 100
+    res_active = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "active", "repo": "project"}},
+    )
+    parsed_active = json.loads(_extract_text(res_active))
+    assert parsed_active["health_score"] == 100
+    assert parsed_active["verdict"] == "Excellent — very contributor-friendly"
+
+    # Abandoned repo: 0
+    res_abandoned = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "abandoned", "repo": "project"}},
+    )
+    parsed_abandoned = json.loads(_extract_text(res_abandoned))
+    assert parsed_abandoned["health_score"] == 0
+    assert parsed_abandoned["verdict"] == "Low — may be abandoned or hard to contribute to"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("number", ["not-a-number", 0, -5])
 @pytest.mark.parametrize("tool", [
     "opencollab_check_issue_availability", "opencollab_generate_pr_plan",
