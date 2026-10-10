@@ -10,6 +10,38 @@ import httpx
 from mcp.server.mcpserver import MCPServer
 
 from ..constants import (
+    HEALTH_FORKS_HIGH,
+    HEALTH_FORKS_LOW,
+    HEALTH_FORKS_MEDIUM,
+    HEALTH_MAX_COMMUNITY_FILES_POINTS,
+    HEALTH_MAX_SCORE,
+    HEALTH_MERGE_RATE_HIGH,
+    HEALTH_MERGE_RATE_MEDIUM,
+    HEALTH_OPEN_ISSUES_MAX,
+    HEALTH_OPEN_ISSUES_MIN,
+    HEALTH_POINTS_DESCRIPTION,
+    HEALTH_POINTS_FORKS_HIGH,
+    HEALTH_POINTS_FORKS_LOW,
+    HEALTH_POINTS_FORKS_MEDIUM,
+    HEALTH_POINTS_MERGE_RATE_HIGH,
+    HEALTH_POINTS_MERGE_RATE_LOW,
+    HEALTH_POINTS_MERGE_RATE_MEDIUM,
+    HEALTH_POINTS_OPEN_ISSUES_ANY,
+    HEALTH_POINTS_OPEN_ISSUES_OPTIMAL,
+    HEALTH_POINTS_PER_COMMUNITY_FILE,
+    HEALTH_POINTS_PUSH_ACTIVE,
+    HEALTH_POINTS_PUSH_RECENT,
+    HEALTH_POINTS_PUSH_STALE,
+    HEALTH_POINTS_STARS_HIGH,
+    HEALTH_POINTS_STARS_LOW,
+    HEALTH_POINTS_STARS_MEDIUM,
+    HEALTH_POINTS_TOPICS,
+    HEALTH_PUSH_DAYS_ACTIVE,
+    HEALTH_PUSH_DAYS_RECENT,
+    HEALTH_PUSH_DAYS_STALE,
+    HEALTH_STARS_HIGH,
+    HEALTH_STARS_LOW,
+    HEALTH_STARS_MEDIUM,
     HEALTH_VERDICT_EXCELLENT,
     HEALTH_VERDICT_FAIR,
     HEALTH_VERDICT_GOOD,
@@ -67,23 +99,32 @@ def register(mcp: MCPServer) -> None:
 
         last_push_days = days_ago(repo.get("pushed_at"))
         if last_push_days is not None:
-            if last_push_days <= 7: score += 20
-            elif last_push_days <= 30: score += 15
-            elif last_push_days <= 90: score += 8
+            if last_push_days <= HEALTH_PUSH_DAYS_RECENT:
+                score += HEALTH_POINTS_PUSH_RECENT
+            elif last_push_days <= HEALTH_PUSH_DAYS_ACTIVE:
+                score += HEALTH_POINTS_PUSH_ACTIVE
+            elif last_push_days <= HEALTH_PUSH_DAYS_STALE:
+                score += HEALTH_POINTS_PUSH_STALE
         details["last_push_days_ago"] = last_push_days
 
         stars = repo.get("stargazers_count", 0)
-        if stars >= 1000: score += 15
-        elif stars >= 100: score += 10
-        elif stars >= 10: score += 5
+        if stars >= HEALTH_STARS_HIGH:
+            score += HEALTH_POINTS_STARS_HIGH
+        elif stars >= HEALTH_STARS_MEDIUM:
+            score += HEALTH_POINTS_STARS_MEDIUM
+        elif stars >= HEALTH_STARS_LOW:
+            score += HEALTH_POINTS_STARS_LOW
         details["stars"] = stars
 
         merged_count = sum(1 for p in pulls if p.get("merged_at"))
         total_closed = len(pulls)
         merge_rate = round(merged_count / max(total_closed, 1) * 100, 1)
-        if merge_rate >= 60: score += 20
-        elif merge_rate >= 30: score += 12
-        elif merge_rate > 0: score += 5
+        if merge_rate >= HEALTH_MERGE_RATE_HIGH:
+            score += HEALTH_POINTS_MERGE_RATE_HIGH
+        elif merge_rate >= HEALTH_MERGE_RATE_MEDIUM:
+            score += HEALTH_POINTS_MERGE_RATE_MEDIUM
+        elif merge_rate > 0:
+            score += HEALTH_POINTS_MERGE_RATE_LOW
         details["pr_merge_rate_pct"] = merge_rate
 
         has_issues = bool(repo.get("has_issues", True))
@@ -94,8 +135,10 @@ def register(mcp: MCPServer) -> None:
             details["issues_note"] = (
                 "Issues are disabled on GitHub — check the README for where this project tracks work"
             )
-        if 5 <= open_issues <= 500: score += 10
-        elif open_issues > 0: score += 5
+        if HEALTH_OPEN_ISSUES_MIN <= open_issues <= HEALTH_OPEN_ISSUES_MAX:
+            score += HEALTH_POINTS_OPEN_ISSUES_OPTIMAL
+        elif open_issues > 0:
+            score += HEALTH_POINTS_OPEN_ISSUES_ANY
         details["open_issues"] = open_issues
 
         files_info = community.get("files", {}) if isinstance(community, dict) else {}
@@ -108,17 +151,25 @@ def register(mcp: MCPServer) -> None:
             "issue_template": files_info.get("issue_template") is not None,
             "pull_request_template": files_info.get("pull_request_template") is not None,
         }
-        score += min(sum(community_files.values()) * 4, 20)
+        score += min(
+            sum(community_files.values()) * HEALTH_POINTS_PER_COMMUNITY_FILE,
+            HEALTH_MAX_COMMUNITY_FILES_POINTS,
+        )
         details["community_files"] = community_files
 
-        if repo.get("description"): score += 2
-        if repo.get("topics"): score += 3
+        if repo.get("description"):
+            score += HEALTH_POINTS_DESCRIPTION
+        if repo.get("topics"):
+            score += HEALTH_POINTS_TOPICS
 
         forks = repo.get("forks_count", 0)
-        if forks >= 100: score += 10
-        elif forks >= 20: score += 6
-        elif forks >= 5: score += 3
-        score = min(score, 100)
+        if forks >= HEALTH_FORKS_HIGH:
+            score += HEALTH_POINTS_FORKS_HIGH
+        elif forks >= HEALTH_FORKS_MEDIUM:
+            score += HEALTH_POINTS_FORKS_MEDIUM
+        elif forks >= HEALTH_FORKS_LOW:
+            score += HEALTH_POINTS_FORKS_LOW
+        score = min(score, HEALTH_MAX_SCORE)
 
         if details["archived"]:
             verdict = "Archived — read-only, cannot accept contributions"
