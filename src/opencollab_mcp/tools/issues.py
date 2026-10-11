@@ -180,7 +180,7 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_generate_pr_plan(params: IssueInput) -> str:
         """Gather full context about a GitHub issue so the AI can draft a PR plan.
 
-        Fetches issue body, comments, labels, contributing guidelines, and
+        Fetches issue body, comments, labels, contributing guidelines, PR template, and
         repo directory structure for comprehensive PR planning.
         """
         try:
@@ -204,6 +204,23 @@ def register(mcp: MCPServer) -> None:
                     continue
             return ""
 
+        async def _try_pr_template() -> str:
+            locations = [
+                ".github/PULL_REQUEST_TEMPLATE.md",
+                ".github/pull_request_template.md",
+                "PULL_REQUEST_TEMPLATE.md",
+                "docs/PULL_REQUEST_TEMPLATE.md",
+            ]
+            for location in locations:
+                try:
+                    template = await github_get(f"{path}/contents/{location}")
+                    text = decode_base64_content(template)
+                    if text:
+                        return text
+                except Exception:
+                    continue
+            return ""
+
         async def _try_root_dir() -> list[dict]:
             try:
                 rc = await github_get(f"{path}/contents")
@@ -215,12 +232,13 @@ def register(mcp: MCPServer) -> None:
                 return []
 
         try:
-            issue, comments_raw, repo_info, contrib_text, dir_listing = await asyncio.gather(
+            issue, comments_raw, repo_info, contrib_text, dir_listing, template_text = await asyncio.gather(
                 github_get(f"{path}/issues/{issue_num}"),
                 github_get(f"{path}/issues/{issue_num}/comments", {"per_page": 20}),
                 github_get(path),
                 _try_contributing(),
                 _try_root_dir(),
+                _try_pr_template(),
             )
         except Exception as e:
             return handle_github_error(e)
@@ -257,5 +275,6 @@ def register(mcp: MCPServer) -> None:
             },
             "comments": comments,
             "contributing_guidelines_preview": truncate(contrib_text, 1000) if contrib_text else "Not found",
+            "pr_template_preview": truncate(template_text, 1000) if template_text else None,
             "repo_root_files": dir_listing,
         }, indent=2)

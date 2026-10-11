@@ -175,7 +175,7 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
-| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
+| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, PR template preview (`null` when unavailable), and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
 
 </details>
 
