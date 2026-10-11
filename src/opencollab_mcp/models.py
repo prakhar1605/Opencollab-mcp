@@ -10,6 +10,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .constants import RECENT_ISSUES_DAYS
+
 # These values are interpolated straight into API paths like
 # /repos/{owner}/{repo}, so anything outside GitHub's own character set — a
 # '/', '?', '#' or '..' — would silently send the request to a different
@@ -109,4 +111,11 @@ class LanguageInput(BaseModel):
         description="Max number of issues to return (1-30)",
         ge=1,
         le=30,
+    )
+
+    max_age_days: int = Field(
+        default=RECENT_ISSUES_DAYS,
+        description="Search issues created within this many days (1-365; default 90)",
+        ge=1,
+        le=365,
     )

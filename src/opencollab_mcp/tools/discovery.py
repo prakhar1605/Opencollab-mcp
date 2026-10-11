@@ -27,9 +27,10 @@ def register(mcp: MCPServer) -> None:
         """Find open-source issues by language and difficulty.
         Beginner searches use the "good first issue" label, while intermediate
         searches use the "help wanted" label. Returns up to `limit` (default 15,
-        max 30) recently created issues from public repos.
+        max 30) issues from public repos created within `max_age_days`
+        (default 90, range 1-365). Increase it to find older open issues.
         """
-        since = recent_date_str(RECENT_ISSUES_DAYS)
+        since = recent_date_str(params.max_age_days)
         label = difficulty_label(params.difficulty)
         query_parts = [
             # The language is quoted so multi-word values survive: bare
