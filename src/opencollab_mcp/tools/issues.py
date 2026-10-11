@@ -239,6 +239,8 @@ def register(mcp: MCPServer) -> None:
                 "created_days_ago": days_ago(c.get("created_at")),
             }
             for c in comments_raw
+            if c.get("user", {}).get("type") != "Bot"
+            and not c.get("user", {}).get("login", "").endswith("[bot]")
         ]
         labels = [lb.get("name", "") for lb in issue.get("labels", [])]
         return json.dumps({
@@ -256,6 +258,7 @@ def register(mcp: MCPServer) -> None:
                 "comments_count": issue.get("comments", 0),
             },
             "comments": comments,
+            "bot_comments_skipped": len(comments_raw) - len(comments),
             "contributing_guidelines_preview": truncate(contrib_text, 1000) if contrib_text else "Not found",
             "repo_root_files": dir_listing,
         }, indent=2)
