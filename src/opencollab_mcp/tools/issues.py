@@ -7,7 +7,7 @@ import json
 
 from mcp.server.mcpserver import MCPServer
 
-from ..constants import BLOCKING_ISSUE_LABELS, WARNING_ISSUE_LABELS
+from ..constants import BLOCKING_ISSUE_LABELS, PR_PLAN_ISSUE_BODY_LIMIT, WARNING_ISSUE_LABELS
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
 from ..models import IssueInput
@@ -241,6 +241,7 @@ def register(mcp: MCPServer) -> None:
             for c in comments_raw
         ]
         labels = [lb.get("name", "") for lb in issue.get("labels", [])]
+        body = issue.get("body") or ""
         return json.dumps({
             "repo": f"{params.owner}/{params.repo}",
             "primary_language": repo_info.get("language"),
@@ -248,7 +249,9 @@ def register(mcp: MCPServer) -> None:
             "issue": {
                 "number": issue_num,
                 "title": issue.get("title", ""),
-                "body": truncate(issue.get("body"), 1500),
+                "body": truncate(body, PR_PLAN_ISSUE_BODY_LIMIT),
+                "body_truncated": len(body) > PR_PLAN_ISSUE_BODY_LIMIT,
+                "body_length": len(body),
                 "labels": labels,
                 "state": issue.get("state"),
                 "author": issue.get("user", {}).get("login", "unknown"),
