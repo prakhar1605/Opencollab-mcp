@@ -9,8 +9,8 @@ from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, recent_date_str, truncate
-from ..models import LanguageInput, UsernameInput
+from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
+from ..models import LanguageInput, MatchMeInput
 
 
 def register(mcp: MCPServer) -> None:
@@ -26,11 +26,12 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_find_issues(params: LanguageInput) -> str:
         """Find open-source issues by language and difficulty.
         Beginner searches use the "good first issue" label, while intermediate
-        searches use the "help wanted" label. Returns up to 15 recently created
-        issues from public repos.
+        searches use the "help wanted" label. Returns up to `limit` (default 15,
+        max 30) issues from public repos created within `max_age_days`
+        (default 90, range 1-365). Increase it to find older open issues.
         """
-        since = recent_date_str(RECENT_ISSUES_DAYS)
-        label = 'label:"good first issue"' if params.difficulty == "beginner" else 'label:"help wanted"'
+        since = recent_date_str(params.max_age_days)
+        label = difficulty_label(params.difficulty)
         query_parts = [
             # The language is quoted so multi-word values survive: bare
             # `language:Jupyter Notebook` is parsed by GitHub as
@@ -48,7 +49,7 @@ def register(mcp: MCPServer) -> None:
             result = await github_search(
                 "issues",
                 " ".join(query_parts),
-                {"sort": "created", "order": "desc", "per_page": 15},
+                {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)
@@ -70,6 +71,7 @@ def register(mcp: MCPServer) -> None:
             "total_found": result.get("total_count", 0),
             "language": params.language,
             "issues": issues,
+            "difficulty": params.difficulty,
         }, indent=2)
 
     @mcp.tool(
@@ -80,12 +82,12 @@ def register(mcp: MCPServer) -> None:
             "idempotentHint": True, "openWorldHint": True,
         },
     )
-    async def opencollab_match_me(params: UsernameInput) -> str:
+    async def opencollab_match_me(params: MatchMeInput) -> str:
         """All-in-one: analyze a GitHub profile and instantly find issues
         matched to that user's top skills.
 
-        Detects the user's primary language and returns 10 matching
-        good-first-issues.
+        Detects the user's primary language and returns up to `limit`
+        (default 10, max 30) matching issues.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -99,7 +101,7 @@ def register(mcp: MCPServer) -> None:
         except Exception as e:
             return handle_github_error(e)
 
-        lang_bytes: dict[str, int] = {}
+        lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
             # A fork's language is the upstream project's, not evidence of the
@@ -109,15 +111,15 @@ def register(mcp: MCPServer) -> None:
                 continue
             lang = repo.get("language")
             if lang:
-                lang_bytes[lang] = lang_bytes.get(lang, 0) + repo.get("size", 0)
+                lang_repos[lang] = lang_repos.get(lang, 0) + 1
             for t in repo.get("topics", []):
                 topics_set.add(t)
 
-        total = max(sum(lang_bytes.values()), 1)
-        top_langs = sorted(lang_bytes.items(), key=lambda x: x[1], reverse=True)[:3]
+        total = max(sum(lang_repos.values()), 1)
+        top_langs = sorted(lang_repos.items(), key=lambda x: x[1], reverse=True)[:3]
         languages = [
-            {"name": n, "percentage": round(b / total * 100, 1)}
-            for n, b in top_langs
+            {"name": name, "percentage": round(count / total * 100, 1)}
+            for name, count in top_langs
         ]
         # A profile with no owned repo carrying language data — a brand-new
         # account, a fork-only account, an org-only contributor — would
@@ -125,12 +127,14 @@ def register(mcp: MCPServer) -> None:
         language_detected = bool(top_langs)
         primary_lang = top_langs[0][0] if language_detected else "Python"
         since = recent_date_str(RECENT_ISSUES_DAYS)
+        label = difficulty_label(params.difficulty)
+
         try:
             result = await github_search(
                 "issues",
-                f'language:"{primary_lang}" label:"good first issue" state:open '
+                f'language:"{primary_lang}" {label} state:open '
                 f'is:issue created:>{since} is:public',
-                {"sort": "created", "order": "desc", "per_page": 10},
+                {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)
@@ -153,6 +157,7 @@ def register(mcp: MCPServer) -> None:
             "topics": sorted(topics_set)[:10],
             "matched_language": primary_lang,
             "matched_issues": issues,
+            "difficulty": params.difficulty,
         }
         if not language_detected:
             # Present only when the fallback fired, so its presence is the

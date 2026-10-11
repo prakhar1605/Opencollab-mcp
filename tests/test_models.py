@@ -8,9 +8,15 @@ from pydantic import ValidationError
 from opencollab_mcp.models import (
     IssueInput,
     LanguageInput,
+    MatchMeInput,
     RepoInput,
     UsernameInput,
 )
+
+
+def test_match_me_rejects_path_characters():
+    with pytest.raises(ValidationError):
+        MatchMeInput(username="octo/cat")
 
 
 def test_username_strips_whitespace():
@@ -55,6 +61,18 @@ def test_issue_input_accepts_hashed_number():
     assert m.issue_number == "#456"
 
 
+@pytest.mark.parametrize("number", [123, 0, -5])
+def test_issue_input_normalizes_integer(number):
+    m = IssueInput(owner="x", repo="y", issue_number=number)
+    assert m.issue_number == str(number)
+
+
+@pytest.mark.parametrize("number", [True, False, 1.5, 123.0])
+def test_issue_input_rejects_non_integer_numbers(number):
+    with pytest.raises(ValidationError):
+        IssueInput(owner="x", repo="y", issue_number=number)
+
+
 def test_language_input_required():
     with pytest.raises(ValidationError):
         LanguageInput()  # type: ignore
@@ -94,3 +112,48 @@ def test_language_rejects_double_quote():
 @pytest.mark.parametrize("lang", ["C++", "C#", "Jupyter Notebook", "F*"])
 def test_language_accepts_real_names(lang):
     assert LanguageInput(language=lang).language == lang
+
+
+def test_language_input_limit_defaults_to_15():
+    assert LanguageInput(language="Python").limit == 15
+
+
+@pytest.mark.parametrize("limit", [1, 30])
+def test_language_input_accepts_limit_bounds(limit):
+    assert LanguageInput(language="Python", limit=limit).limit == limit
+
+
+@pytest.mark.parametrize("limit", [0, -1, 31])
+def test_language_input_rejects_out_of_range_limit(limit):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", limit=limit)
+
+
+def test_match_me_input_limit_defaults_to_10():
+    assert MatchMeInput(username="octocat").limit == 10
+
+
+@pytest.mark.parametrize("limit", [1, 30])
+def test_match_me_input_accepts_limit_bounds(limit):
+    assert MatchMeInput(username="octocat", limit=limit).limit == limit
+
+
+@pytest.mark.parametrize("limit", [0, -1, 31])
+def test_match_me_input_rejects_out_of_range_limit(limit):
+    with pytest.raises(ValidationError):
+        MatchMeInput(username="octocat", limit=limit)
+
+
+def test_language_input_max_age_days_default():
+    assert LanguageInput(language="Python").max_age_days == 90
+
+
+@pytest.mark.parametrize("days", [1, 365])
+def test_language_input_accepts_max_age_days_bounds(days):
+    assert LanguageInput(language="Python", max_age_days=days).max_age_days == days
+
+
+@pytest.mark.parametrize("days", [0, -1, 366, 1.5])
+def test_language_input_rejects_invalid_max_age_days(days):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", max_age_days=days)

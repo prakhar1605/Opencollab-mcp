@@ -10,6 +10,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .constants import RECENT_ISSUES_DAYS
+
 # These values are interpolated straight into API paths like
 # /repos/{owner}/{repo}, so anything outside GitHub's own character set — a
 # '/', '?', '#' or '..' — would silently send the request to a different
@@ -23,6 +25,21 @@ def _reject_dot_segments(value: str) -> str:
     if value in (".", ".."):
         raise ValueError(f"{value!r} is not a valid repository name")
     return value
+
+
+class MatchMeInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    username: str = Field(..., description="GitHub username", min_length=1, max_length=39, pattern=LOGIN_PATTERN,)
+    difficulty: Literal["beginner", "intermediate"] = Field(
+        default="beginner",
+        description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
+    )
+    limit: int = Field(
+        default=10,
+        description="Max number of issues to return (1-30)",
+        ge=1,
+        le=30,
+    )
 
 
 class UsernameInput(BaseModel):
@@ -57,15 +74,19 @@ class IssueInput(BaseModel):
         ..., description="Repository name", min_length=1, max_length=100,
         pattern=REPO_NAME_PATTERN,
     )
-    # Kept as str on purpose — many LLM clients pass numbers as strings,
-    # and we run a permissive parser (handles '#123', '123', ' 123 ').
+    # Normalize JSON integers to the string parser's existing input format.
     issue_number: str = Field(
         ...,
-        description="Issue number (e.g. '123' or '#123')",
+        description="Issue number (e.g. 123, '123' or '#123')",
         min_length=1,
     )
 
     _check_repo = field_validator("repo")(_reject_dot_segments)
+
+    @field_validator("issue_number", mode="before")
+    @classmethod
+    def normalize_issue_number(cls, value: object) -> object:
+        return str(value) if type(value) is int else value
 
 
 class LanguageInput(BaseModel):
@@ -83,4 +104,18 @@ class LanguageInput(BaseModel):
     difficulty: Literal["beginner", "intermediate"] = Field(
         default="beginner",
         description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
+    )
+
+    limit: int = Field(
+        default=15,
+        description="Max number of issues to return (1-30)",
+        ge=1,
+        le=30,
+    )
+
+    max_age_days: int = Field(
+        default=RECENT_ISSUES_DAYS,
+        description="Search issues created within this many days (1-365; default 90)",
+        ge=1,
+        le=365,
     )

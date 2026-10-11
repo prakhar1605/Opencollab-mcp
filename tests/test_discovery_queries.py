@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from opencollab_mcp.helpers import recent_date_str
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
 
@@ -126,6 +127,25 @@ async def test_find_issues_intermediate_keeps_quoting_and_is_issue(server, captu
 
 
 @pytest.mark.asyncio
+async def test_match_me_intermediate_sends_help_wanted(server, captured_queries, mock_github):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+
+    await _call(
+        server,
+        "opencollab_match_me",
+        {"params": {"username": "gopher", "difficulty": "intermediate"}},
+    )
+
+    query = captured_queries[0]
+    assert 'label:"help wanted"' in query
+    assert 'label:"good first issue"' not in query
+    assert "is:issue" in query.split()
+
+
+@pytest.mark.asyncio
 async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, mock_github):
     mock_github({
         "/users/rustacean": {"login": "rustacean"},
@@ -138,4 +158,69 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     assert 'label:"good first issue"' in query
     assert "state:open" in query.split()
     assert "is:public" in query.split()
-    assert "created:>" in query
+    assert f"created:>{recent_date_str(90)}" in query
+
+
+# ---- limit (#16) -----------------------------------------------------------
+
+@pytest.fixture
+def captured_params(monkeypatch) -> list[dict[str, Any]]:
+    """Record the request params the discovery tools send to GitHub search."""
+    calls: list[dict[str, Any]] = []
+
+    async def _fake_search(endpoint: str, query: str, params: dict[str, Any] | None = None):
+        calls.append(params or {})
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", _fake_search)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_find_issues_defaults_to_15_per_page(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    assert captured_params[0]["per_page"] == 15
+
+
+@pytest.mark.asyncio
+async def test_find_issues_passes_limit_as_per_page(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python", "limit": 3}})
+
+    assert captured_params[0]["per_page"] == 3
+
+
+@pytest.mark.asyncio
+async def test_match_me_defaults_to_10_per_page(server, captured_params, mock_github):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher"}})
+
+    assert captured_params[0]["per_page"] == 10
+
+
+@pytest.mark.asyncio
+async def test_match_me_passes_limit_as_per_page(server, captured_params, mock_github):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher", "limit": 5}})
+
+    assert captured_params[0]["per_page"] == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("days", [None, 1, 365])
+async def test_find_issues_uses_requested_age(server, captured_queries, days):
+    params = {"language": "Python"}
+    if days is not None:
+        params["max_age_days"] = days
+    expected_since = recent_date_str(days if days is not None else 90)
+    await _call(server, "opencollab_find_issues", {"params": params})
+    assert len(captured_queries) == 1
+    assert f"created:>{expected_since}" in captured_queries[0].split()

@@ -11,6 +11,8 @@
 
 6 focused tools. Works with Claude Desktop, Cursor, VS Code, or any MCP-compatible client.
 
+[Changelog](CHANGELOG.md)
+
 </div>
 
 ---
@@ -116,6 +118,7 @@ docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
 The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
 For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
+`GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
 
 </details>
 
@@ -151,8 +154,8 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns 10 matching good-first-issues — all in one call. |
-| `opencollab_find_issues` | Up to 15 recent issues for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
+| `opencollab_find_issues` | Up to 15 issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
 
 </details>
 
@@ -161,7 +164,7 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. |
+| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
 | `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
 
 </details>
@@ -171,8 +174,8 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has a PR? Checks the timeline so you don't waste a weekend. |
-| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, and repo layout for the AI to plan a fix. |
+| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
+| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
 
 </details>
 
@@ -202,6 +205,62 @@ OpenCollab needs a GitHub token for two reasons:
 2. **Some endpoints need auth.** A few tools (`/timeline`, etc.) may not work without it.
 
 Scopes needed: just `public_repo`. OpenCollab never writes anything — it's all reads.
+
+---
+
+## Troubleshooting
+
+### Which version am I running?
+
+```bash
+opencollab-mcp --version   # or: opencollab-mcp -V
+```
+
+Include this output when you report a bug. If the flag isn't recognised, you're on an older release; upgrade (see the next item).
+
+### `uvx` keeps running an old version
+
+`uvx` caches packages, so it can keep using a stale copy. Force the newest release with either:
+
+```bash
+uvx --refresh opencollab-mcp
+uvx opencollab-mcp@latest
+```
+
+In an MCP client config, use `"args": ["--refresh", "opencollab-mcp"]` (or `"opencollab-mcp@latest"`).
+
+### Rate-limit errors
+
+Symptom: a tool returns
+
+```
+Error: GitHub API rate limit exceeded. Resets in ~N minutes. Set GITHUB_TOKEN for a 5,000 requests/hour limit.
+```
+
+Fix: set `GITHUB_TOKEN` (see [Authentication & rate limits](#authentication--rate-limits)). Without a token you get 60 requests/hour; with one, 5,000. If the token is already set, restart your MCP client so it picks up the environment variable.
+
+### Docker container shows "unhealthy"
+
+The health check calls `/health` on `PORT` inside the container. Check that:
+
+1. `PORT` matches the port you publish. If you set `-e PORT=9000`, publish `-p 9000:9000`.
+2. `/health` responds:
+
+   ```bash
+   curl localhost:8000/health   # expected output: ok
+   ```
+
+3. The container is running in HTTP mode (`TRANSPORT=streamable-http`, the image default). In `stdio` mode there is no `/health` endpoint.
+
+### Where are the logs?
+
+Logs go to **stderr** (stdout is reserved for the MCP protocol in stdio mode). For more detail, set `OPENCOLLAB_LOG_LEVEL`:
+
+```bash
+OPENCOLLAB_LOG_LEVEL=DEBUG opencollab-mcp
+```
+
+Valid levels: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`. In Docker, read them with `docker logs <container>`. Most MCP clients also keep a per-server log; check your client's MCP log viewer.
 
 ---
 
@@ -247,11 +306,19 @@ tests/                 # pytest suite
 
 Issues and PRs are welcome. The codebase is small (~1000 lines) and intentionally easy to read. Every scoring threshold lives in `constants.py` so tuning is a one-line change. New tools follow the same pattern: a function in `tools/<category>.py`, a Pydantic input model in `models.py`, and a test in `tests/test_tools.py`.
 
+When reporting bugs or submitting issues, please include the version of `opencollab-mcp` you are running (especially when using `uvx` caches):
+
+```bash
+opencollab-mcp --version
+```
+*(or `opencollab-mcp -V`)*
+
 The `main` branch is protected — please open a PR rather than pushing directly. CI runs on Python 3.10, 3.11, 3.12, and 3.13.
 
 ---
 
 ## Roadmap
+
 
 Already shipped (v0.6.0):
 
@@ -261,6 +328,12 @@ Already shipped (v0.6.0):
 - pytest suite on Python 3.10/3.11/3.12/3.13 in CI
 - Stdio (local) and streamable-HTTP (remote) transports
 - Branch protection + required CI checks on `main`
+
+Merged since v0.6.1 (see the [Changelog](CHANGELOG.md)):
+
+- Migrated to the MCP 2.x server API
+- `GET /health` endpoint for the HTTP transports, used by the Docker `HEALTHCHECK`
+- Validated tool inputs: GitHub usernames, repo names and issue numbers are checked before any request
 
 Open ideas:
 

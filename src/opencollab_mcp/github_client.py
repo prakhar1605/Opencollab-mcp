@@ -22,11 +22,13 @@ from .constants import (
     DEFAULT_TIMEOUT,
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
+    GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
     USER_AGENT,
 )
 
 logger = logging.getLogger("opencollab_mcp.github")
 
+_rate_limit_warned = False
 
 # ---- in-memory TTL cache --------------------------------------------------
 
@@ -95,7 +97,10 @@ def reset_client() -> None:
 
 def _get_headers() -> dict[str, str]:
     """Build auth headers from environment."""
-    token = os.environ.get("GITHUB_TOKEN", "")
+    # Strip whitespace: a token from a file or `$(cat token.txt)` often
+    # carries a trailing newline, which httpx rejects as an illegal header
+    # value with an error that doesn't mention the token at all.
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
@@ -129,13 +134,15 @@ async def github_get(
         params=params or {},
     )
 
+    resp.raise_for_status()
+    _check_rate_limit(resp)
+
     # GitHub returns 202 with empty body while it computes statistics
     # (commit_activity, participation, contributors on cold repos).
     if resp.status_code == 202:
         logger.info("GitHub returned 202 (stats computing) for %s", path)
         return {}
 
-    resp.raise_for_status()
     try:
         data = resp.json()
     except ValueError:
@@ -177,6 +184,48 @@ def _reset_hint(response: httpx.Response) -> str:
     return f" Resets in ~{round(seconds / 60)} minutes."
 
 
+def _check_rate_limit(response: httpx.Response) -> None:
+    """Log a warning when GitHub API quota is running low."""
+    global _rate_limit_warned
+    header_value = response.headers.get("x-ratelimit-remaining")
+    if header_value is None:
+        return
+    try:
+        remaining = int(header_value)
+    except (ValueError, TypeError):
+        return
+    if remaining >= GITHUB_RATE_LIMIT_WARNING_THRESHOLD:
+        _rate_limit_warned = False
+        return
+    if not _rate_limit_warned:
+        logger.warning(
+            "GitHub API quota is running low (%s requests remaining).%s"
+            "Set GITHUB_TOKEN for a 5,000 requests/hour limit.",
+            remaining,
+            _reset_hint(response)
+        )
+        _rate_limit_warned = True
+
+
+def _validation_message(response: httpx.Response) -> str:
+    fallback = response.text[:200]
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback
+    if not isinstance(payload, dict):
+        return fallback
+    message = payload.get("message")
+    if not isinstance(message, str) or not message:
+        return fallback
+    errors = payload.get("errors")
+    if isinstance(errors, list) and errors and isinstance(errors[0], dict):
+        detail = errors[0].get("message")
+        if isinstance(detail, str) and detail:
+            return f"{message}: {detail}"
+    return message
+
+
 def handle_github_error(e: Exception) -> str:
     """Return a human-friendly error string for GitHub API failures.
 
@@ -206,7 +255,7 @@ def handle_github_error(e: Exception) -> str:
         if code == 404:
             return "Error: Resource not found on GitHub. Double-check the username or repo name."
         if code == 422:
-            return f"Error: GitHub rejected the request — {e.response.text[:200]}"
+            return f"Error: GitHub rejected the request — {_validation_message(e.response)}"
         return f"Error: GitHub API returned status {code}."
     if isinstance(e, httpx.TimeoutException):
         return "Error: GitHub API request timed out. Please try again."
