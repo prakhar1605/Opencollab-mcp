@@ -259,4 +259,7 @@ def handle_github_error(e: Exception) -> str:
         return f"Error: GitHub API returned status {code}."
     if isinstance(e, httpx.TimeoutException):
         return "Error: GitHub API request timed out. Please try again."
+    if isinstance(e, httpx.TransportError):
+        return ("Error: Could not reach api.github.com. "
+                "Check your internet connection or proxy settings and try again.")
     return f"Error: Unexpected failure — {type(e).__name__}: {e}"
