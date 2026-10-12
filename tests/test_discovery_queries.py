@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from opencollab_mcp.helpers import recent_date_str
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
 
@@ -157,7 +158,7 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     assert 'label:"good first issue"' in query
     assert "state:open" in query.split()
     assert "is:public" in query.split()
-    assert "created:>" in query
+    assert f"created:>{recent_date_str(90)}" in query
 
 
 # ---- limit (#16) -----------------------------------------------------------
@@ -211,3 +212,15 @@ async def test_match_me_passes_limit_as_per_page(server, captured_params, mock_g
     await _call(server, "opencollab_match_me", {"params": {"username": "gopher", "limit": 5}})
 
     assert captured_params[0]["per_page"] == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("days", [None, 1, 365])
+async def test_find_issues_uses_requested_age(server, captured_queries, days):
+    params = {"language": "Python"}
+    if days is not None:
+        params["max_age_days"] = days
+    expected_since = recent_date_str(days if days is not None else 90)
+    await _call(server, "opencollab_find_issues", {"params": params})
+    assert len(captured_queries) == 1
+    assert f"created:>{expected_since}" in captured_queries[0].split()

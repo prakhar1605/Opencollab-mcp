@@ -106,3 +106,23 @@ def test_version_short_flag_prints_version_and_exits(monkeypatch, capsys):
     assert __version__ in output
     assert "opencollab-mcp" in output
     assert len(calls) == 0
+
+
+@pytest.mark.parametrize("flag", ["--help", "-h"])
+def test_help_lists_environment_without_starting_server(monkeypatch, capsys, flag):
+    calls = []
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **kw: calls.append((a, kw)))
+    monkeypatch.setenv("GITHUB_TOKEN", "synthetic-token-must-not-appear")
+    monkeypatch.setenv("PORT", "invalid")
+    with pytest.raises(SystemExit) as exc_info:
+        server.main([flag])
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    for name in ("GITHUB_TOKEN", "TRANSPORT", "PORT", "OPENCOLLAB_LOG_LEVEL"):
+        assert name in captured.out
+    assert "stdio (default)" in captured.out
+    assert "default 8000" in captured.out
+    assert "INFO (default)" in captured.out
+    assert "synthetic-token-must-not-appear" not in captured.out
+    assert captured.err == ""
+    assert calls == []

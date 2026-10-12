@@ -71,6 +71,14 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="opencollab-mcp",
         description="OpenCollab MCP Server — AI-powered open source contribution matchmaker.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "environment variables:\n"
+            "  GITHUB_TOKEN         GitHub token (optional; recommended for a higher rate limit)\n"
+            "  TRANSPORT            stdio (default), streamable-http (alias: http), or sse\n"
+            "  PORT                 port for HTTP transports (default 8000)\n"
+            "  OPENCOLLAB_LOG_LEVEL DEBUG, INFO (default), WARNING, ERROR, CRITICAL"
+        ),
     )
     parser.add_argument(
         "-V",
