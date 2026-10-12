@@ -24,7 +24,7 @@ def register(mcp: MCPServer) -> None:
         },
     )
     async def opencollab_find_issues(params: LanguageInput) -> str:
-        """Find open-source issues by language and difficulty.
+        """Find unassigned open-source issues by language and difficulty.
         Beginner searches use the "good first issue" label, while intermediate
         searches use the "help wanted" label. Returns up to `limit` (default 15,
         max 30) issues from public repos created within `max_age_days`
@@ -39,6 +39,7 @@ def register(mcp: MCPServer) -> None:
             f'language:"{params.language}"',
             label,
             "state:open",
+            "no:assignee",
             # /search/issues returns pull requests too, and a PR carrying the
             # label would otherwise look like an issue to pick up.
             "is:issue",
@@ -87,7 +88,7 @@ def register(mcp: MCPServer) -> None:
         matched to that user's top skills.
 
         Detects the user's primary language and returns up to `limit`
-        (default 10, max 30) matching issues.
+        (default 10, max 30) matching unassigned issues.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -133,7 +134,7 @@ def register(mcp: MCPServer) -> None:
             result = await github_search(
                 "issues",
                 f'language:"{primary_lang}" {label} state:open '
-                f'is:issue created:>{since} is:public',
+                f'is:issue no:assignee created:>{since} is:public',
                 {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
