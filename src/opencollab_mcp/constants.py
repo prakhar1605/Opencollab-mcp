@@ -43,6 +43,9 @@ WARNING_ISSUE_LABELS = frozenset({
     "on hold",
 })
 
+# ---- PR planning previews ----
+PR_PLAN_ISSUE_BODY_LIMIT = 1500
+
 # ---- Search windows (days) ----
 RECENT_ISSUES_DAYS = 90
 

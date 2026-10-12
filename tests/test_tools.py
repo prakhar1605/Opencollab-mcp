@@ -441,6 +441,29 @@ async def test_generate_pr_plan_rejects_pull_request_number(mock_github):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body", [None, "", "Short report", "x" * 1500, "x" * 1501, "x" * 4000],
+    ids=["null", "empty", "short", "at-limit", "over-limit", "long"],
+)
+async def test_generate_pr_plan_reports_body_truncation(mock_github, body):
+    mock_github({
+        "/repos/o/r/issues/7": {"body": body},
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    issue = json.loads(_extract_text(result))["issue"]
+    original = body or ""
+    assert issue["body_length"] == len(original)
+    assert issue["body_truncated"] is (len(original) > 1500)
+    assert issue["body"] == original[:1500] + ("…" if len(original) > 1500 else "")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("include_bots", [False, True])
 async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
     humans = [

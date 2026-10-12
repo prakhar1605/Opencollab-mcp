@@ -142,3 +142,18 @@ def test_match_me_input_accepts_limit_bounds(limit):
 def test_match_me_input_rejects_out_of_range_limit(limit):
     with pytest.raises(ValidationError):
         MatchMeInput(username="octocat", limit=limit)
+
+
+def test_language_input_max_age_days_default():
+    assert LanguageInput(language="Python").max_age_days == 90
+
+
+@pytest.mark.parametrize("days", [1, 365])
+def test_language_input_accepts_max_age_days_bounds(days):
+    assert LanguageInput(language="Python", max_age_days=days).max_age_days == days
+
+
+@pytest.mark.parametrize("days", [0, -1, 366, 1.5])
+def test_language_input_rejects_invalid_max_age_days(days):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", max_age_days=days)
