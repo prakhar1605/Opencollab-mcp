@@ -90,6 +90,11 @@ def main(argv: list[str] | None = None) -> None:
 
     _configure_logging()
     transport = os.environ.get("TRANSPORT", "stdio").lower()
+    if transport not in ("stdio", "streamable-http", "http", "sse"):
+        sys.exit(
+            "Error: TRANSPORT must be one of stdio, streamable-http, http, sse; "
+            f"got {transport!r}"
+        )
     logger = logging.getLogger("opencollab_mcp")
     if unknown_args:
         logger.warning(
