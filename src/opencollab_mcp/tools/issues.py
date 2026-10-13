@@ -60,9 +60,18 @@ def register(mcp: MCPServer) -> None:
             }, indent=2)
 
         if issue.get("state") != "open":
+            state_reason = issue.get("state_reason")
+            reason = f"Issue is {issue.get('state', 'unknown')}"
+            if issue.get("state") == "closed":
+                reason = {
+                    "completed": "Issue is closed — already fixed",
+                    "not_planned": "Issue is closed as not planned — maintainers don't intend to change this",
+                    "duplicate": "Issue is closed as a duplicate",
+                }.get(state_reason, reason)
             return json.dumps({
                 "available": False,
-                "reason": f"Issue is {issue.get('state', 'unknown')}",
+                "reason": reason,
+                "state_reason": state_reason,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
