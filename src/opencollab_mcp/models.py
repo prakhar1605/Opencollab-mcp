@@ -96,6 +96,7 @@ class LanguageInput(BaseModel):
         ...,
         description="Programming language (e.g. 'Python', 'TypeScript', 'Rust')",
         min_length=1,
+        max_length=50,
         # The value is wrapped in double quotes in the search query, so a
         # stray '"' would close the quote and inject the rest as qualifiers.
         pattern=r'^[^"]+$',

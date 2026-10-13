@@ -229,10 +229,13 @@ def _validation_message(response: httpx.Response) -> str:
 def handle_github_error(e: Exception) -> str:
     """Return a human-friendly error string for GitHub API failures.
 
-    Always logs full traceback so production deployments can diagnose,
-    while users see something concise and actionable.
+    Expected HTTP client errors log warnings without tracebacks. Other
+    failures retain their traceback for diagnosis while users see guidance.
     """
-    logger.exception("GitHub API error: %s", e)
+    if isinstance(e, httpx.HTTPStatusError) and 400 <= e.response.status_code < 500:
+        logger.warning("GitHub API %s for %s", e.response.status_code, e.request.url)
+    else:
+        logger.exception("GitHub API error: %s", e, exc_info=(type(e), e, e.__traceback__))
 
     if isinstance(e, httpx.HTTPStatusError):
         code = e.response.status_code
@@ -259,4 +262,7 @@ def handle_github_error(e: Exception) -> str:
         return f"Error: GitHub API returned status {code}."
     if isinstance(e, httpx.TimeoutException):
         return "Error: GitHub API request timed out. Please try again."
+    if isinstance(e, httpx.TransportError):
+        return ("Error: Could not reach api.github.com. "
+                "Check your internet connection or proxy settings and try again.")
     return f"Error: Unexpected failure — {type(e).__name__}: {e}"
