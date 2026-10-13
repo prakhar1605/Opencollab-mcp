@@ -7,7 +7,12 @@ import json
 
 from mcp.server.mcpserver import MCPServer
 
-from ..constants import BLOCKING_ISSUE_LABELS, PR_PLAN_ISSUE_BODY_LIMIT, WARNING_ISSUE_LABELS
+from ..constants import (
+    ASSIGNED_ISSUE_STALE_DAYS,
+    BLOCKING_ISSUE_LABELS,
+    PR_PLAN_ISSUE_BODY_LIMIT,
+    WARNING_ISSUE_LABELS,
+)
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
 from ..models import IssueInput
@@ -60,18 +65,40 @@ def register(mcp: MCPServer) -> None:
             }, indent=2)
 
         if issue.get("state") != "open":
+            state_reason = issue.get("state_reason")
+            reason = f"Issue is {issue.get('state', 'unknown')}"
+            if issue.get("state") == "closed":
+                reason = {
+                    "completed": "Issue is closed — already fixed",
+                    "not_planned": "Issue is closed as not planned — maintainers don't intend to change this",
+                    "duplicate": "Issue is closed as a duplicate",
+                }.get(state_reason, reason)
             return json.dumps({
                 "available": False,
-                "reason": f"Issue is {issue.get('state', 'unknown')}",
+                "reason": reason,
+                "state_reason": state_reason,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
         assignees = [a.get("login", "") for a in issue.get("assignees", [])]
         if assignees:
+            last_activity_days = days_ago(issue.get("updated_at"))
+            reason = f"Already assigned to: {', '.join(assignees)}"
+
+            if (
+                last_activity_days is not None
+                and last_activity_days >= ASSIGNED_ISSUE_STALE_DAYS
+            ):
+                reason += (
+                    f", but no activity for {last_activity_days} days — "
+                    "consider politely asking whether it is still being worked on"
+        )
+
             return json.dumps({
                 "available": False,
-                "reason": f"Already assigned to: {', '.join(assignees)}",
+                "reason": reason,
                 "issue_title": issue.get("title", ""),
+                "last_activity_days_ago": last_activity_days,
             }, indent=2)
 
         if issue.get("locked"):
@@ -180,7 +207,7 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_generate_pr_plan(params: IssueInput) -> str:
         """Gather full context about a GitHub issue so the AI can draft a PR plan.
 
-        Fetches issue body, comments, labels, contributing guidelines, and
+        Fetches issue body, comments, labels, contributing guidelines, PR template, and
         repo directory structure for comprehensive PR planning.
         """
         try:
@@ -204,6 +231,23 @@ def register(mcp: MCPServer) -> None:
                     continue
             return ""
 
+        async def _try_pr_template() -> str:
+            locations = [
+                ".github/PULL_REQUEST_TEMPLATE.md",
+                ".github/pull_request_template.md",
+                "PULL_REQUEST_TEMPLATE.md",
+                "docs/PULL_REQUEST_TEMPLATE.md",
+            ]
+            for location in locations:
+                try:
+                    template = await github_get(f"{path}/contents/{location}")
+                    text = decode_base64_content(template)
+                    if text:
+                        return text
+                except Exception:
+                    continue
+            return ""
+
         async def _try_root_dir() -> list[dict]:
             try:
                 rc = await github_get(f"{path}/contents")
@@ -215,12 +259,13 @@ def register(mcp: MCPServer) -> None:
                 return []
 
         try:
-            issue, comments_raw, repo_info, contrib_text, dir_listing = await asyncio.gather(
+            issue, comments_raw, repo_info, contrib_text, dir_listing, template_text = await asyncio.gather(
                 github_get(f"{path}/issues/{issue_num}"),
                 github_get(f"{path}/issues/{issue_num}/comments", {"per_page": 20}),
                 github_get(path),
                 _try_contributing(),
                 _try_root_dir(),
+                _try_pr_template(),
             )
         except Exception as e:
             return handle_github_error(e)
@@ -263,5 +308,6 @@ def register(mcp: MCPServer) -> None:
             "comments": comments,
             "bot_comments_skipped": len(comments_raw) - len(comments),
             "contributing_guidelines_preview": truncate(contrib_text, 1000) if contrib_text else "Not found",
+            "pr_template_preview": truncate(template_text, 1000) if template_text else None,
             "repo_root_files": dir_listing,
         }, indent=2)

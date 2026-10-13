@@ -27,7 +27,7 @@ def register(mcp: MCPServer) -> None:
         """Find unassigned open-source issues by language and difficulty.
         Beginner searches use the "good first issue" label, while intermediate
         searches use the "help wanted" label. Returns up to `limit` (default 15,
-        max 30) issues from public repos created within `max_age_days`
+        max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
         """
         since = recent_date_str(params.max_age_days)
@@ -45,6 +45,7 @@ def register(mcp: MCPServer) -> None:
             "is:issue",
             f"created:>{since}",
             "is:public",
+            "archived:false",
         ]
         try:
             result = await github_search(
@@ -88,7 +89,7 @@ def register(mcp: MCPServer) -> None:
         matched to that user's top skills.
 
         Detects the user's primary language and returns up to `limit`
-        (default 10, max 30) matching unassigned issues.
+        (default 10, max 30) matching unassigned issues from non-archived repos.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -134,7 +135,7 @@ def register(mcp: MCPServer) -> None:
             result = await github_search(
                 "issues",
                 f'language:"{primary_lang}" {label} state:open '
-                f'is:issue no:assignee created:>{since} is:public',
+                f'is:issue no:assignee created:>{since} is:public archived:false',
                 {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:

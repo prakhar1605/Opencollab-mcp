@@ -7,6 +7,7 @@ These don't deeply test scoring — they verify that:
 
 from __future__ import annotations
 
+import base64
 import json
 
 import pytest
@@ -491,6 +492,8 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
 
 
 @pytest.mark.asyncio
+
+@pytest.mark.asyncio
 async def test_impact_estimator_returns_structured_content(mock_github):
     """structured_content carries typed fields and matches the text content."""
     mock_github({
@@ -580,3 +583,51 @@ async def test_impact_estimator_publishes_output_schema():
         schema["properties"]
     )
     assert "note" not in schema["required"]
+
+
+@pytest.mark.parametrize("location", [
+    ".github/PULL_REQUEST_TEMPLATE.md", ".github/pull_request_template.md",
+    "PULL_REQUEST_TEMPLATE.md", "docs/PULL_REQUEST_TEMPLATE.md", None,
+])
+async def test_generate_pr_plan_includes_pr_template(mock_github, location):
+    template = "## Checklist\n- [ ] Link the issue\n"
+    routes = {
+        "/repos/o/r/issues/7": {},
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    }
+    if location:
+        routes[f"/repos/o/r/contents/{location}"] = {
+            "encoding": "base64", "content": base64.b64encode(template.encode()).decode(),
+        }
+    mock_github(routes)
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    plan = json.loads(_extract_text(result))
+    assert plan["pr_template_preview"] == (template if location else None)
+
+
+@pytest.mark.asyncio
+async def test_generate_pr_plan_limits_template_and_prefers_github_location(mock_github):
+    template = "é" * 1001
+    mock_github({
+        "/repos/o/r/issues/7": {},
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+        "/repos/o/r/contents/.github/PULL_REQUEST_TEMPLATE.md": {
+            "encoding": "base64", "content": base64.b64encode(template.encode()).decode(),
+        },
+        "/repos/o/r/contents/PULL_REQUEST_TEMPLATE.md": {
+            "encoding": "base64", "content": base64.b64encode(b"Root template").decode(),
+        },
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    assert json.loads(_extract_text(result))["pr_template_preview"] == "é" * 1000 + "…"
+

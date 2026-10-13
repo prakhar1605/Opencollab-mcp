@@ -19,6 +19,7 @@ except PackageNotFoundError:
 # ---- API / network ----
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
+GITHUB_RETRY_DELAY_SECONDS = 1.0
 USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"
 GITHUB_RATE_LIMIT_WARNING_THRESHOLD = 10
@@ -48,7 +49,7 @@ PR_PLAN_ISSUE_BODY_LIMIT = 1500
 
 # ---- Search windows (days) ----
 RECENT_ISSUES_DAYS = 90
-
+ASSIGNED_ISSUE_STALE_DAYS = 60
 # ---- repo_health scoring ----
 # Activity recency (days ago -> score points)
 HEALTH_PUSH_DAYS_RECENT = 7

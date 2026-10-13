@@ -260,3 +260,57 @@ async def test_plain_good_first_issue_has_no_warning(mock_github):
     assert payload["available"] is True
     assert payload["reason"] == "No assignees, no open PRs — go for it!"
     assert "warning_labels" not in payload
+
+@pytest.mark.asyncio
+async def test_recently_updated_assigned_issue_has_no_stale_warning(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "state": "open",
+            "title": "Bug",
+            "assignees": [{"login": "fast-dev"}],
+            "updated_at": "2026-10-10T00:00:00Z",
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "fast-dev" in payload["reason"]
+    assert "no activity for" not in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_stale_assigned_issue_includes_activity_warning(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "state": "open",
+            "title": "Bug",
+            "assignees": [{"login": "fast-dev"}],
+            "updated_at": "2026-07-01T00:00:00Z",
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "fast-dev" in payload["reason"]
+    assert "no activity for" in payload["reason"]
+    assert payload["last_activity_days_ago"] >= 60
+
+
+@pytest.mark.asyncio
+async def test_assigned_issue_without_updated_at_has_no_stale_warning(mock_github):
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "state": "open",
+            "title": "Bug",
+            "assignees": [{"login": "fast-dev"}],
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "fast-dev" in payload["reason"]
+    assert "no activity for" not in payload["reason"]
+    assert payload["last_activity_days_ago"] is None

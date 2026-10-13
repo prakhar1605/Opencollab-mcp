@@ -9,6 +9,7 @@ Wraps httpx with:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -23,6 +24,7 @@ from .constants import (
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
     GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
+    GITHUB_RETRY_DELAY_SECONDS,
     USER_AGENT,
 )
 
@@ -100,7 +102,7 @@ def _get_headers() -> dict[str, str]:
     # Strip whitespace: a token from a file or `$(cat token.txt)` often
     # carries a trailing newline, which httpx rejects as an illegal header
     # value with an error that doesn't mention the token at all.
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    token = os.environ.get("GITHUB_TOKEN", "").strip() or os.environ.get("GH_TOKEN", "").strip()
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
@@ -128,11 +130,15 @@ async def github_get(
         if cached is not None:
             return cached
 
-    resp = await _get_client().get(
-        f"{GITHUB_API_BASE}{path}",
-        headers=_get_headers(),
-        params=params or {},
-    )
+    for attempt in range(2):
+        resp = await _get_client().get(
+            f"{GITHUB_API_BASE}{path}",
+            headers=_get_headers(),
+            params=params or {},
+        )
+        if resp.status_code not in (502, 503, 504) or attempt == 1:
+            break
+        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
 
     resp.raise_for_status()
     _check_rate_limit(resp)

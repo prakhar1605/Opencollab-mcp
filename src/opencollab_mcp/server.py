@@ -75,6 +75,7 @@ def main(argv: list[str] | None = None) -> None:
         epilog=(
             "environment variables:\n"
             "  GITHUB_TOKEN         GitHub token (optional; recommended for a higher rate limit)\n"
+            "  GH_TOKEN             fallback when GITHUB_TOKEN is unset or empty\n"
             "  TRANSPORT            stdio (default), streamable-http (alias: http), or sse\n"
             "  PORT                 port for HTTP transports (default 8000)\n"
             "  OPENCOLLAB_LOG_LEVEL DEBUG, INFO (default), WARNING, ERROR, CRITICAL"
