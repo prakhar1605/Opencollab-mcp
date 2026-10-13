@@ -80,7 +80,7 @@ def register(mcp: MCPServer) -> None:
     async def opencollab_repo_health(params: RepoInput) -> str:
         """Score a repository's health and contributor-friendliness (0-100).
 
-        Checks activity recency, community size, PR merge patterns, open
+        Checks activity recency, community size, human PR merge patterns, open
         issues, and whether the repo has essential contributor files.
         Archived repositories receive a read-only verdict regardless of score.
         """
@@ -116,8 +116,14 @@ def register(mcp: MCPServer) -> None:
             score += HEALTH_POINTS_STARS_LOW
         details["stars"] = stars
 
-        merged_count = sum(1 for p in pulls if p.get("merged_at"))
-        total_closed = len(pulls)
+        human_pulls = [
+            p for p in pulls
+            if (p.get("user") or {}).get("type") != "Bot"
+            and not ((p.get("user") or {}).get("login") or "").endswith("[bot]")
+        ]
+        details["bot_prs_excluded"] = len(pulls) - len(human_pulls)
+        merged_count = sum(1 for p in human_pulls if p.get("merged_at"))
+        total_closed = len(human_pulls)
         merge_rate = round(merged_count / max(total_closed, 1) * 100, 1)
         if merge_rate >= HEALTH_MERGE_RATE_HIGH:
             score += HEALTH_POINTS_MERGE_RATE_HIGH
