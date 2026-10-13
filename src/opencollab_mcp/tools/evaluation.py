@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 from mcp.server.mcpserver import MCPServer
+from mcp.types import CallToolResult, TextContent
 
 from ..constants import (
     HEALTH_FORKS_HIGH,
@@ -52,7 +53,7 @@ from ..constants import (
 )
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago
-from ..models import RepoInput
+from ..models import ImpactEstimate, RepoInput
 
 
 async def _community_profile_or_none(path: str) -> Any | None:
@@ -197,7 +198,9 @@ def register(mcp: MCPServer) -> None:
             "idempotentHint": True, "openWorldHint": True,
         },
     )
-    async def opencollab_impact_estimator(params: RepoInput) -> str:
+    async def opencollab_impact_estimator(
+        params: RepoInput,
+    ) -> Annotated[CallToolResult, ImpactEstimate]:
         """Estimate the impact of contributing to a specific repository.
 
         Produces an impact tier and a suggested resume line for active repositories.
@@ -207,7 +210,12 @@ def register(mcp: MCPServer) -> None:
         try:
             repo = await github_get(path)
         except Exception as e:
-            return handle_github_error(e)
+            # Errors are not an ImpactEstimate, so report them as a tool error
+            # (the SDK skips output-schema validation for `is_error` results).
+            return CallToolResult(
+                content=[TextContent(type="text", text=handle_github_error(e))],
+                is_error=True,
+            )
 
         stars = repo.get("stargazers_count", 0)
         forks = repo.get("forks_count", 0)
@@ -259,4 +267,14 @@ def register(mcp: MCPServer) -> None:
         }
         if archived:
             result["note"] = "Archived — read-only, new contributions are not possible"
-        return json.dumps(result, indent=2)
+
+        estimate = ImpactEstimate.model_validate(result)
+        # exclude_unset keeps the payload identical to the pre-structured output:
+        # `note` is only present for archived repos, `suggested_resume_line` stays
+        # present (as null) when archived.
+        payload = estimate.model_dump(mode="json", exclude_unset=True)
+        return CallToolResult(
+            # Text content is unchanged so existing clients keep parsing it.
+            content=[TextContent(type="text", text=json.dumps(payload, indent=2))],
+            structured_content=payload,
+        )

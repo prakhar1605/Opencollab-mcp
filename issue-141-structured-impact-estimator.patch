@@ -1,0 +1,240 @@
+From c180b7b6e58d563e3c3493e80092908eb1dd0e31 Mon Sep 17 00:00:00 2001
+From: pvnm4 <pavan@example.com>
+Date: Tue, 13 Oct 2026 07:31:22 +0000
+Subject: [PATCH] feat: return structured output from
+ opencollab_impact_estimator (#141)
+
+---
+ CHANGELOG.md                           |  1 +
+ src/opencollab_mcp/models.py           | 32 ++++++++-
+ src/opencollab_mcp/tools/evaluation.py | 28 ++++++--
+ tests/test_tools.py                    | 92 ++++++++++++++++++++++++++
+ 4 files changed, 145 insertions(+), 8 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 38db84c..b06e5db 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -16,6 +16,7 @@ Changes merged since v0.6.1.
+ - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
+ 
+ ### Changed
++- `opencollab_impact_estimator` now returns MCP structured output (`structuredContent` plus a published `outputSchema`) while keeping the JSON text content; GitHub errors are now returned as tool errors (`isError`) ([#141](https://github.com/prakhar1605/Opencollab-mcp/issues/141))
+ - Migrated to the MCP 2.x server API, replacing the temporary `mcp<2` pin ([#30](https://github.com/prakhar1605/Opencollab-mcp/pull/30), [#28](https://github.com/prakhar1605/Opencollab-mcp/pull/28))
+ - Reuse one `httpx.AsyncClient` instead of creating one per request ([#24](https://github.com/prakhar1605/Opencollab-mcp/pull/24))
+ - Version is now derived from package metadata instead of being copied ([#23](https://github.com/prakhar1605/Opencollab-mcp/pull/23))
+diff --git a/src/opencollab_mcp/models.py b/src/opencollab_mcp/models.py
+index 8fed46d..63be8b9 100644
+--- a/src/opencollab_mcp/models.py
++++ b/src/opencollab_mcp/models.py
+@@ -1,7 +1,10 @@
+-"""Pydantic input models for OpenCollab MCP tools.
++"""Pydantic models for OpenCollab MCP tools.
+ 
+-`extra="forbid"` rejects unknown fields — important defense against
+-LLM-generated tool calls passing through stray keys.
++Input models use `extra="forbid"` to reject unknown fields — important defense
++against LLM-generated tool calls passing through stray keys.
++
++Output models (e.g. `ImpactEstimate`) describe a tool's structured result. The
++MCP SDK publishes their JSON schema as the tool's `outputSchema`.
+ """
+ 
+ from __future__ import annotations
+@@ -120,3 +123,26 @@ class LanguageInput(BaseModel):
+         ge=1,
+         le=365,
+     )
++
++
++class ImpactEstimate(BaseModel):
++    """Structured result of `opencollab_impact_estimator`."""
++
++    repo: str = Field(..., description="Repository as 'owner/name'")
++    archived: bool = Field(..., description="True if the repository is archived (read-only)")
++    impact_tier: Literal["LOW", "MODERATE", "MEDIUM", "HIGH", "MASSIVE"] = Field(
++        ..., description="Impact tier derived from the star count",
++    )
++    estimated_reach: str = Field(..., description="Human-readable estimate of audience size")
++    stars: int = Field(..., ge=0, description="Stargazer count")
++    forks: int = Field(..., ge=0, description="Fork count")
++    watchers: int = Field(..., ge=0, description="Subscriber (watcher) count")
++    open_issues: int = Field(..., ge=0, description="Open issues and pull requests count")
++    visibility_score: int = Field(..., ge=0, le=100, description="Visibility score (0-100)")
++    suggested_resume_line: str | None = Field(
++        ..., description="Suggested resume line; null for archived repositories",
++    )
++    topics: list[str] = Field(..., description="Repository topics")
++    note: str | None = Field(
++        default=None, description="Present only for archived repositories",
++    )
+diff --git a/src/opencollab_mcp/tools/evaluation.py b/src/opencollab_mcp/tools/evaluation.py
+index a19ae45..e7ae765 100644
+--- a/src/opencollab_mcp/tools/evaluation.py
++++ b/src/opencollab_mcp/tools/evaluation.py
+@@ -4,10 +4,11 @@ from __future__ import annotations
+ 
+ import asyncio
+ import json
+-from typing import Any
++from typing import Annotated, Any
+ 
+ import httpx
+ from mcp.server.mcpserver import MCPServer
++from mcp.types import CallToolResult, TextContent
+ 
+ from ..constants import (
+     HEALTH_FORKS_HIGH,
+@@ -52,7 +53,7 @@ from ..constants import (
+ )
+ from ..github_client import github_get, handle_github_error
+ from ..helpers import days_ago
+-from ..models import RepoInput
++from ..models import ImpactEstimate, RepoInput
+ 
+ 
+ async def _community_profile_or_none(path: str) -> Any | None:
+@@ -197,7 +198,9 @@ def register(mcp: MCPServer) -> None:
+             "idempotentHint": True, "openWorldHint": True,
+         },
+     )
+-    async def opencollab_impact_estimator(params: RepoInput) -> str:
++    async def opencollab_impact_estimator(
++        params: RepoInput,
++    ) -> Annotated[CallToolResult, ImpactEstimate]:
+         """Estimate the impact of contributing to a specific repository.
+ 
+         Produces an impact tier and a suggested resume line for active repositories.
+@@ -207,7 +210,12 @@ def register(mcp: MCPServer) -> None:
+         try:
+             repo = await github_get(path)
+         except Exception as e:
+-            return handle_github_error(e)
++            # Errors are not an ImpactEstimate, so report them as a tool error
++            # (the SDK skips output-schema validation for `is_error` results).
++            return CallToolResult(
++                content=[TextContent(type="text", text=handle_github_error(e))],
++                is_error=True,
++            )
+ 
+         stars = repo.get("stargazers_count", 0)
+         forks = repo.get("forks_count", 0)
+@@ -259,4 +267,14 @@ def register(mcp: MCPServer) -> None:
+         }
+         if archived:
+             result["note"] = "Archived — read-only, new contributions are not possible"
+-        return json.dumps(result, indent=2)
++
++        estimate = ImpactEstimate.model_validate(result)
++        # exclude_unset keeps the payload identical to the pre-structured output:
++        # `note` is only present for archived repos, `suggested_resume_line` stays
++        # present (as null) when archived.
++        payload = estimate.model_dump(mode="json", exclude_unset=True)
++        return CallToolResult(
++            # Text content is unchanged so existing clients keep parsing it.
++            content=[TextContent(type="text", text=json.dumps(payload, indent=2))],
++            structured_content=payload,
++        )
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index 3d46642..587cb36 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -488,3 +488,95 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
+     assert [comment["body"] for comment in plan["comments"]] == [c["body"] for c in humans]
+     assert plan["bot_comments_skipped"] == len(bots)
+     assert plan["issue"]["comments_count"] == len(humans) + len(bots)
++
++
++@pytest.mark.asyncio
++async def test_impact_estimator_returns_structured_content(mock_github):
++    """structured_content carries typed fields and matches the text content."""
++    mock_github({
++        "/repos/o/r": {
++            "stargazers_count": 10_000,
++            "forks_count": 200,
++            "subscribers_count": 1_000,
++            "open_issues_count": 20,
++            "description": "A useful library",
++            "topics": ["python"],
++            "archived": False,
++        }
++    })
++    result = await _call_tool_compat(
++        build_server(),
++        "opencollab_impact_estimator",
++        {"params": {"owner": "o", "repo": "r"}},
++    )
++
++    assert not result.is_error
++    structured = result.structured_content
++    assert structured == {
++        "repo": "o/r",
++        "archived": False,
++        "impact_tier": "HIGH",
++        "estimated_reach": "tens of thousands of developers",
++        "stars": 10_000,
++        "forks": 200,
++        "watchers": 1_000,
++        "open_issues": 20,
++        "visibility_score": 62,
++        "suggested_resume_line": (
++            "Contributed to o/r (10,000+ stars), reaching tens of thousands of developers"
++        ),
++        "topics": ["python"],
++    }
++    # Backward compatibility: text content is the same payload as JSON.
++    assert json.loads(_extract_text(result)) == structured
++
++
++@pytest.mark.asyncio
++async def test_impact_estimator_structured_content_for_archived_repo(mock_github):
++    mock_github({
++        "/repos/o/old": {
++            "stargazers_count": 5,
++            "forks_count": 0,
++            "subscribers_count": 0,
++            "open_issues_count": 0,
++            "description": "Old",
++            "topics": [],
++            "archived": True,
++        }
++    })
++    result = await _call_tool_compat(
++        build_server(),
++        "opencollab_impact_estimator",
++        {"params": {"owner": "o", "repo": "old"}},
++    )
++    structured = result.structured_content
++    assert structured["archived"] is True
++    assert structured["suggested_resume_line"] is None
++    assert structured["note"] == "Archived — read-only, new contributions are not possible"
++    assert json.loads(_extract_text(result)) == structured
++
++
++@pytest.mark.asyncio
++async def test_impact_estimator_github_error_is_a_tool_error(mock_github):
++    """Failures are reported as an error result with the readable message."""
++    mock_github({})  # every path 404s
++    result = await _call_tool_compat(
++        build_server(),
++        "opencollab_impact_estimator",
++        {"params": {"owner": "o", "repo": "missing"}},
++    )
++    assert result.is_error
++    assert result.structured_content is None
++    assert _extract_text(result).startswith("Error: Resource not found on GitHub")
++
++
++@pytest.mark.asyncio
++async def test_impact_estimator_publishes_output_schema():
++    tools = await _list_tools_compat(build_server())
++    tool = next(t for t in tools if t.name == "opencollab_impact_estimator")
++    schema = tool.output_schema
++    assert schema["type"] == "object"
++    assert {"repo", "impact_tier", "stars", "visibility_score", "topics"} <= set(
++        schema["properties"]
++    )
++    assert "note" not in schema["required"]
+-- 
+2.43.0
+

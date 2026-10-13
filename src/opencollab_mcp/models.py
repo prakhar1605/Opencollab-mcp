@@ -1,7 +1,10 @@
-"""Pydantic input models for OpenCollab MCP tools.
+"""Pydantic models for OpenCollab MCP tools.
 
-`extra="forbid"` rejects unknown fields — important defense against
-LLM-generated tool calls passing through stray keys.
+Input models use `extra="forbid"` to reject unknown fields — important defense
+against LLM-generated tool calls passing through stray keys.
+
+Output models (e.g. `ImpactEstimate`) describe a tool's structured result. The
+MCP SDK publishes their JSON schema as the tool's `outputSchema`.
 """
 
 from __future__ import annotations
@@ -119,4 +122,27 @@ class LanguageInput(BaseModel):
         description="Search issues created within this many days (1-365; default 90)",
         ge=1,
         le=365,
+    )
+
+
+class ImpactEstimate(BaseModel):
+    """Structured result of `opencollab_impact_estimator`."""
+
+    repo: str = Field(..., description="Repository as 'owner/name'")
+    archived: bool = Field(..., description="True if the repository is archived (read-only)")
+    impact_tier: Literal["LOW", "MODERATE", "MEDIUM", "HIGH", "MASSIVE"] = Field(
+        ..., description="Impact tier derived from the star count",
+    )
+    estimated_reach: str = Field(..., description="Human-readable estimate of audience size")
+    stars: int = Field(..., ge=0, description="Stargazer count")
+    forks: int = Field(..., ge=0, description="Fork count")
+    watchers: int = Field(..., ge=0, description="Subscriber (watcher) count")
+    open_issues: int = Field(..., ge=0, description="Open issues and pull requests count")
+    visibility_score: int = Field(..., ge=0, le=100, description="Visibility score (0-100)")
+    suggested_resume_line: str | None = Field(
+        ..., description="Suggested resume line; null for archived repositories",
+    )
+    topics: list[str] = Field(..., description="Repository topics")
+    note: str | None = Field(
+        default=None, description="Present only for archived repositories",
     )

@@ -16,6 +16,7 @@ Changes merged since v0.6.1.
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 
 ### Changed
+- `opencollab_impact_estimator` now returns MCP structured output (`structuredContent` plus a published `outputSchema`) while keeping the JSON text content; GitHub errors are now returned as tool errors (`isError`) ([#141](https://github.com/prakhar1605/Opencollab-mcp/issues/141))
 - Migrated to the MCP 2.x server API, replacing the temporary `mcp<2` pin ([#30](https://github.com/prakhar1605/Opencollab-mcp/pull/30), [#28](https://github.com/prakhar1605/Opencollab-mcp/pull/28))
 - Reuse one `httpx.AsyncClient` instead of creating one per request ([#24](https://github.com/prakhar1605/Opencollab-mcp/pull/24))
 - Version is now derived from package metadata instead of being copied ([#23](https://github.com/prakhar1605/Opencollab-mcp/pull/23))

@@ -488,3 +488,95 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
     assert [comment["body"] for comment in plan["comments"]] == [c["body"] for c in humans]
     assert plan["bot_comments_skipped"] == len(bots)
     assert plan["issue"]["comments_count"] == len(humans) + len(bots)
+
+
+@pytest.mark.asyncio
+async def test_impact_estimator_returns_structured_content(mock_github):
+    """structured_content carries typed fields and matches the text content."""
+    mock_github({
+        "/repos/o/r": {
+            "stargazers_count": 10_000,
+            "forks_count": 200,
+            "subscribers_count": 1_000,
+            "open_issues_count": 20,
+            "description": "A useful library",
+            "topics": ["python"],
+            "archived": False,
+        }
+    })
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+
+    assert not result.is_error
+    structured = result.structured_content
+    assert structured == {
+        "repo": "o/r",
+        "archived": False,
+        "impact_tier": "HIGH",
+        "estimated_reach": "tens of thousands of developers",
+        "stars": 10_000,
+        "forks": 200,
+        "watchers": 1_000,
+        "open_issues": 20,
+        "visibility_score": 62,
+        "suggested_resume_line": (
+            "Contributed to o/r (10,000+ stars), reaching tens of thousands of developers"
+        ),
+        "topics": ["python"],
+    }
+    # Backward compatibility: text content is the same payload as JSON.
+    assert json.loads(_extract_text(result)) == structured
+
+
+@pytest.mark.asyncio
+async def test_impact_estimator_structured_content_for_archived_repo(mock_github):
+    mock_github({
+        "/repos/o/old": {
+            "stargazers_count": 5,
+            "forks_count": 0,
+            "subscribers_count": 0,
+            "open_issues_count": 0,
+            "description": "Old",
+            "topics": [],
+            "archived": True,
+        }
+    })
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "o", "repo": "old"}},
+    )
+    structured = result.structured_content
+    assert structured["archived"] is True
+    assert structured["suggested_resume_line"] is None
+    assert structured["note"] == "Archived — read-only, new contributions are not possible"
+    assert json.loads(_extract_text(result)) == structured
+
+
+@pytest.mark.asyncio
+async def test_impact_estimator_github_error_is_a_tool_error(mock_github):
+    """Failures are reported as an error result with the readable message."""
+    mock_github({})  # every path 404s
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "o", "repo": "missing"}},
+    )
+    assert result.is_error
+    assert result.structured_content is None
+    assert _extract_text(result).startswith("Error: Resource not found on GitHub")
+
+
+@pytest.mark.asyncio
+async def test_impact_estimator_publishes_output_schema():
+    tools = await _list_tools_compat(build_server())
+    tool = next(t for t in tools if t.name == "opencollab_impact_estimator")
+    schema = tool.output_schema
+    assert schema["type"] == "object"
+    assert {"repo", "impact_tier", "stars", "visibility_score", "topics"} <= set(
+        schema["properties"]
+    )
+    assert "note" not in schema["required"]
