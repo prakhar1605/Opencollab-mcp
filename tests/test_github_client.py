@@ -348,6 +348,7 @@ def test_get_headers_strips_trailing_whitespace_from_token(monkeypatch):
 
 
 def test_get_headers_treats_whitespace_only_token_as_no_token(monkeypatch):
+    monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.setenv("GITHUB_TOKEN", "   ")
     assert "Authorization" not in github_client._get_headers()
 

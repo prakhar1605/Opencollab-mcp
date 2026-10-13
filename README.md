@@ -199,6 +199,10 @@ A few design choices worth knowing:
 
 ## Authentication & rate limits
 
+The server uses `GITHUB_TOKEN` when non-empty, otherwise it falls back to
+`GH_TOKEN` (also used by the GitHub CLI). Surrounding whitespace is stripped
+from either value; when neither provides a token, requests are unauthenticated.
+
 OpenCollab needs a GitHub token for two reasons:
 
 1. **Higher rate limit.** Authenticated requests get 5,000/hour vs 60/hour unauthenticated.

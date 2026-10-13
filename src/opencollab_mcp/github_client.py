@@ -100,7 +100,7 @@ def _get_headers() -> dict[str, str]:
     # Strip whitespace: a token from a file or `$(cat token.txt)` often
     # carries a trailing newline, which httpx rejects as an illegal header
     # value with an error that doesn't mention the token at all.
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    token = os.environ.get("GITHUB_TOKEN", "").strip() or os.environ.get("GH_TOKEN", "").strip()
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
