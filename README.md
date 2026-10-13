@@ -154,8 +154,8 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns 10 matching issues — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 recent issues (adjustable with `limit`, 1–30) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
 
 </details>
 
@@ -313,18 +313,19 @@ opencollab-mcp --version
 ```
 *(or `opencollab-mcp -V`)*
 
-The `main` branch is protected — please open a PR rather than pushing directly. CI runs on Python 3.10, 3.11, and 3.12.
+The `main` branch is protected — please open a PR rather than pushing directly. CI runs on Python 3.10, 3.11, 3.12, and 3.13.
 
 ---
 
 ## Roadmap
+
 
 Already shipped (v0.6.0):
 
 - 6 focused tools across discovery, evaluation, and issue intelligence
 - PyPI release (`pip install opencollab-mcp` / `uvx opencollab-mcp`)
 - 5-minute in-memory cache + parallel API calls
-- pytest suite on Python 3.10/3.11/3.12 in CI
+- pytest suite on Python 3.10/3.11/3.12/3.13 in CI
 - Stdio (local) and streamable-HTTP (remote) transports
 - Branch protection + required CI checks on `main`
 

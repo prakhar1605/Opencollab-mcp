@@ -226,6 +226,36 @@ async def test_repo_health_reports_archived_status(mock_github, archived, merged
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("has_issues", [True, False, None])
+@pytest.mark.parametrize("open_count, issue_points", [(0, 0), (2, 5), (10, 10), (501, 5)])
+async def test_repo_health_accounts_for_disabled_issues(
+    mock_github, has_issues, open_count, issue_points,
+):
+    repo = {"stargazers_count": 10, "open_issues_count": open_count}
+    if has_issues is not None:
+        repo["has_issues"] = has_issues
+    mock_github({
+        "/repos/o/r": repo,
+        "/repos/o/r/pulls": [],
+        "/repos/o/r/community/profile": {"files": {}},
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+    parsed = json.loads(_extract_text(result))
+    enabled = has_issues is not False
+    assert parsed["details"]["has_issues"] is enabled
+    assert parsed["health_score"] == 5 + (issue_points if enabled else 0)
+    assert parsed["details"]["open_issues"] == (open_count if enabled else 0)
+    if enabled:
+        assert "issues_note" not in parsed["details"]
+    else:
+        assert "Issues are disabled" in parsed["details"]["issues_note"]
+        assert "README" in parsed["details"]["issues_note"]
+
+
+@pytest.mark.asyncio
 async def test_repo_health_scores_when_community_profile_is_forbidden(mock_github):
     mock_github({
         "/repos/o/r": {},
@@ -243,6 +273,74 @@ async def test_repo_health_scores_when_community_profile_is_forbidden(mock_githu
     parsed = json.loads(_extract_text(result))
     assert isinstance(parsed["health_score"], int)
     assert parsed["details"]["community_profile_available"] is False
+
+
+@pytest.mark.asyncio
+async def test_repo_health_score_calculation(mock_github):
+    """Verify repo_health scoring on an active repo and an abandoned repo."""
+    mock_github({
+        "/repos/active/project": {
+            "pushed_at": "2026-10-09T00:00:00Z",  # <= 7 days: +20
+            "stargazers_count": 1500,  # >= 1000: +15
+            "forks_count": 150,  # >= 100: +10
+            "open_issues_count": 50,  # 5..500: +10
+            "has_issues": True,
+            "description": "An active open-source project",  # +2
+            "topics": ["python", "ai"],  # +3
+            "archived": False,
+        },
+        "/repos/active/project/pulls": [
+            {"merged_at": "2026-10-08T00:00:00Z"},
+            {"merged_at": "2026-10-07T00:00:00Z"},
+        ],  # 2/2 merged = 100% (>= 60): +20
+        "/repos/active/project/community/profile": {
+            "files": {
+                "contributing": {},
+                "code_of_conduct": {},
+                "license": {},
+                "readme": {},
+                "issue_template": {},
+                "pull_request_template": {},
+            },  # 6 * 4 = 24 capped at 20: +20
+        },
+        "/repos/abandoned/project": {
+            "pushed_at": "2020-01-01T00:00:00Z",  # > 90 days: +0
+            "stargazers_count": 2,  # < 10: +0
+            "forks_count": 1,  # < 5: +0
+            "open_issues_count": 0,  # 0: +0
+            "has_issues": True,
+            "description": None,  # +0
+            "topics": [],  # +0
+            "archived": False,
+        },
+        "/repos/abandoned/project/pulls": [
+            {"merged_at": None},
+        ],  # 0% merge rate: +0
+        "/repos/abandoned/project/community/profile": {
+            "files": {},  # 0 files: +0
+        },
+    })
+    server = build_server()
+
+    # Active repo: 20 (push) + 15 (stars) + 20 (merge) + 10 (issues) + 20 (files) + 2 (desc) + 3 (topics) + 10 (forks) = 100
+    res_active = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "active", "repo": "project"}},
+    )
+    parsed_active = json.loads(_extract_text(res_active))
+    assert parsed_active["health_score"] == 100
+    assert parsed_active["verdict"] == "Excellent — very contributor-friendly"
+
+    # Abandoned repo: 0
+    res_abandoned = await _call_tool_compat(
+        server,
+        "opencollab_repo_health",
+        {"params": {"owner": "abandoned", "repo": "project"}},
+    )
+    parsed_abandoned = json.loads(_extract_text(res_abandoned))
+    assert parsed_abandoned["health_score"] == 0
+    assert parsed_abandoned["verdict"] == "Low — may be abandoned or hard to contribute to"
 
 
 @pytest.mark.asyncio
@@ -340,3 +438,53 @@ async def test_generate_pr_plan_rejects_pull_request_number(mock_github):
 
     parsed = json.loads(_extract_text(result))
     assert parsed == {"error": "#7 is a pull request, not an issue"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body", [None, "", "Short report", "x" * 1500, "x" * 1501, "x" * 4000],
+    ids=["null", "empty", "short", "at-limit", "over-limit", "long"],
+)
+async def test_generate_pr_plan_reports_body_truncation(mock_github, body):
+    mock_github({
+        "/repos/o/r/issues/7": {"body": body},
+        "/repos/o/r/issues/7/comments": [],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    issue = json.loads(_extract_text(result))["issue"]
+    original = body or ""
+    assert issue["body_length"] == len(original)
+    assert issue["body_truncated"] is (len(original) > 1500)
+    assert issue["body"] == original[:1500] + ("…" if len(original) > 1500 else "")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("include_bots", [False, True])
+async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
+    humans = [
+        {"user": {"login": "contributor", "type": "User"}, "body": "Reproduction steps"},
+        {"user": {"login": "robotics-fan"}, "body": "Expected behavior"},
+    ]
+    bots = [
+        {"user": {"login": "triage", "type": "Bot"}, "body": "Stale reminder"},
+        {"user": {"login": "cla[bot]", "type": "User"}, "body": "Sign the CLA"},
+    ] if include_bots else []
+    mock_github({
+        "/repos/o/r/issues/7": {"comments": len(humans) + len(bots)},
+        "/repos/o/r/issues/7/comments": humans[:1] + bots + humans[1:],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    plan = json.loads(_extract_text(result))
+    assert [comment["body"] for comment in plan["comments"]] == [c["body"] for c in humans]
+    assert plan["bot_comments_skipped"] == len(bots)
+    assert plan["issue"]["comments_count"] == len(humans) + len(bots)

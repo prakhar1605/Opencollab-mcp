@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 
 import httpx
@@ -149,6 +150,36 @@ def test_handle_github_error_timeout():
     err = httpx.TimeoutException("slow")
     msg = github_client.handle_github_error(err)
     assert "timed out" in msg.lower()
+
+
+@pytest.mark.parametrize("errors, detail", [
+    ([{"message": "The requested repositories cannot be searched."}],
+     ": The requested repositories cannot be searched."),
+    ([{"message": "First error"}, {"message": "Second error"}], ": First error"),
+    ([], ""),
+    ([{"code": "invalid"}], ""),
+    (["invalid"], ""),
+    (None, ""),
+])
+def test_handle_github_error_422_formats_json(errors, detail):
+    request = httpx.Request("GET", "https://api.github.com/search/issues")
+    response = httpx.Response(
+        422, request=request, json={"message": "Validation Failed", "errors": errors},
+    )
+    err = httpx.HTTPStatusError("validation", request=request, response=response)
+    assert github_client.handle_github_error(err) == (
+        f"Error: GitHub rejected the request — Validation Failed{detail}"
+    )
+
+
+@pytest.mark.parametrize("body", ["invalid query " * 30, "[]", '{"errors": []}'])
+def test_handle_github_error_422_preserves_raw_fallback(body):
+    request = httpx.Request("GET", "https://api.github.com/search/issues")
+    response = httpx.Response(422, request=request, text=body)
+    err = httpx.HTTPStatusError("validation", request=request, response=response)
+    assert github_client.handle_github_error(err) == (
+        f"Error: GitHub rejected the request — {body[:200]}"
+    )
 
 
 def test_handle_github_error_unknown():
@@ -309,3 +340,205 @@ def test_cache_evicts_oldest_when_full(monkeypatch):
     assert "key1" not in github_client._cache, "oldest-expiry entry should be evicted"
     assert "key2" in github_client._cache
     assert "key3" in github_client._cache
+
+
+def test_get_headers_strips_trailing_whitespace_from_token(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "  ghp_abc\n")
+    assert github_client._get_headers()["Authorization"] == "Bearer ghp_abc"
+
+
+def test_get_headers_treats_whitespace_only_token_as_no_token(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "   ")
+    assert "Authorization" not in github_client._get_headers()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_warns_only_once(monkeypatch, caplog):
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=200,
+            json={"name": "octotat"},
+            headers={
+                "x-ratelimit-remaining": "5",
+                "x-ratelimit-reset": str(int(time.time()) + 1800),
+            },
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    real_async_client = httpx.AsyncClient
+
+    def patched_async_client(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", patched_async_client)
+
+    github_client.reset_client()
+    github_client.clear_cache()
+    monkeypatch.setattr(github_client, "_rate_limit_warned", False)
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        await github_client.github_get("/users/octocat", use_cache=False)
+        await github_client.github_get("/users/octocat", use_cache=False)
+
+    target_message = "GitHub API quota is running low"
+    messages = [
+        record.getMessage() for record in caplog.records if target_message in record.getMessage()
+    ]
+
+    assert len(messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_warning_resets_after_recovery(monkeypatch, caplog):
+    remaining_values = iter(["5", "4000", "5"])
+
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        remaining = next(remaining_values)
+        return httpx.Response(
+            status_code=200,
+            json={"name": "octotat"},
+            headers={
+                "x-ratelimit-remaining": remaining,
+                "x-ratelimit-reset": str(int(time.time()) + 1800),
+            },
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    real_async_client = httpx.AsyncClient
+
+    def patched_async_client(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", patched_async_client)
+
+    github_client.reset_client()
+    github_client.clear_cache()
+    monkeypatch.setattr(github_client, "_rate_limit_warned", False)
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        await github_client.github_get("/users/octocat", use_cache=False)
+        await github_client.github_get("/users/octocat", use_cache=False)
+        await github_client.github_get("/users/octocat", use_cache=False)
+
+    target_message = "GitHub API quota is running low"
+    messages = [
+        record.getMessage() for record in caplog.records if target_message in record.getMessage()
+    ]
+
+    assert len(messages) == 2
+    assert "5 requests remaining" in messages[0]
+    assert "5 requests remaining" in messages[1]
+
+
+@pytest.mark.parametrize(
+    "remaining",
+    [None, "invalid", "", "10", "4000"],
+)
+@pytest.mark.asyncio
+async def test_rate_limit_does_not_warn_for_safe_or_invalid_headers(monkeypatch, caplog, remaining):
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        headers = {}
+        if remaining is not None:
+            headers["x-ratelimit-remaining"] = remaining
+
+        return httpx.Response(
+            status_code=200,
+            json={"name": "octotat"},
+            headers=headers,
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    real_async_client = httpx.AsyncClient
+
+    def patched_async_client(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", patched_async_client)
+
+    github_client.reset_client()
+    github_client.clear_cache()
+    monkeypatch.setattr(github_client, "_rate_limit_warned", False)
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        await github_client.github_get("/users/octocat", use_cache=False)
+
+    target_message = "GitHub API quota is running low"
+    messages = [
+        record.getMessage() for record in caplog.records if target_message in record.getMessage()
+    ]
+
+    assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_does_not_warn_on_http_error(monkeypatch, caplog):
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=403,
+            json={"message": "Forbidden"},
+            headers={"x-ratelimit-remaining": "5"},
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    real_async_client = httpx.AsyncClient
+
+    def patched_async_client(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", patched_async_client)
+
+    github_client.reset_client()
+    github_client.clear_cache()
+    monkeypatch.setattr(github_client, "_rate_limit_warned", False)
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        with pytest.raises(httpx.HTTPStatusError):
+            await github_client.github_get("/users/octocat", use_cache=False)
+
+    target_message = "GitHub API quota is running low"
+    messages = [
+        record.getMessage() for record in caplog.records if target_message in record.getMessage()
+    ]
+
+    assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_warns_on_202_response(monkeypatch, caplog):
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=202,
+            content=b"",
+            headers={"x-ratelimit-remaining": "5"},
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    real_async_client = httpx.AsyncClient
+
+    def patched_async_client(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", patched_async_client)
+
+    github_client.reset_client()
+    github_client.clear_cache()
+    monkeypatch.setattr(github_client, "_rate_limit_warned", False)
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        result = await github_client.github_get(
+            "/repos/foo/bar/stats/commit_activity",
+            use_cache=False,
+        )
+
+    target_message = "GitHub API quota is running low"
+    messages = [
+        record.getMessage() for record in caplog.records if target_message in record.getMessage()
+    ]
+
+    assert result == {}
+    assert len(messages) == 1

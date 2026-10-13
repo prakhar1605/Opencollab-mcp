@@ -71,6 +71,14 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="opencollab-mcp",
         description="OpenCollab MCP Server — AI-powered open source contribution matchmaker.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "environment variables:\n"
+            "  GITHUB_TOKEN         GitHub token (optional; recommended for a higher rate limit)\n"
+            "  TRANSPORT            stdio (default), streamable-http (alias: http), or sse\n"
+            "  PORT                 port for HTTP transports (default 8000)\n"
+            "  OPENCOLLAB_LOG_LEVEL DEBUG, INFO (default), WARNING, ERROR, CRITICAL"
+        ),
     )
     parser.add_argument(
         "-V",
@@ -78,11 +86,22 @@ def main(argv: list[str] | None = None) -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    parser.parse_known_args(argv)
+    _, unknown_args = parser.parse_known_args(argv)
 
     _configure_logging()
     transport = os.environ.get("TRANSPORT", "stdio").lower()
+    if transport not in ("stdio", "streamable-http", "http", "sse"):
+        sys.exit(
+            "Error: TRANSPORT must be one of stdio, streamable-http, http, sse; "
+            f"got {transport!r}"
+        )
     logger = logging.getLogger("opencollab_mcp")
+    if unknown_args:
+        logger.warning(
+            "Ignoring unknown arguments: %s. Configure the server with environment "
+            "variables (TRANSPORT, PORT); see the README.",
+            " ".join(unknown_args),
+        )
 
     if transport in ("streamable-http", "http"):
         port = _read_port()
