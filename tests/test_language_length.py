@@ -22,3 +22,8 @@ def test_language_accepts_limit_and_real_names(language):
 def test_language_still_rejects_query_injection():
     with pytest.raises(ValidationError):
         LanguageInput(language='Python" label:"bug')
+
+
+def test_language_rejects_more_than_three_languages():
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python, TypeScript, Rust, Go")

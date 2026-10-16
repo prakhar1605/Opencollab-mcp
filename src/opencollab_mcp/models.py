@@ -97,13 +97,23 @@ class LanguageInput(BaseModel):
 
     language: str = Field(
         ...,
-        description="Programming language (e.g. 'Python', 'TypeScript', 'Rust')",
+        description="Programming language(s), comma-separated (up to 3; e.g. 'Python, TypeScript')",
         min_length=1,
         max_length=50,
         # The value is wrapped in double quotes in the search query, so a
         # stray '"' would close the quote and inject the rest as qualifiers.
         pattern=r'^[^"]+$',
     )
+
+    @field_validator("language")
+    @classmethod
+    def validate_language_count(cls, value: str) -> str:
+        languages = [language.strip() for language in value.split(",")]
+        if len(languages) > 3:
+            raise ValueError("at most 3 languages may be provided")
+        if any(not language for language in languages):
+            raise ValueError("languages must not be empty")
+        return value
 
     difficulty: Literal["beginner", "intermediate"] = Field(
         default="beginner",

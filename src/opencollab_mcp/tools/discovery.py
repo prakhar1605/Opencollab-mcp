@@ -32,11 +32,12 @@ def register(mcp: MCPServer) -> None:
         """
         since = recent_date_str(params.max_age_days)
         label = difficulty_label(params.difficulty)
+        languages = [language.strip() for language in params.language.split(",")]
         query_parts = [
-            # The language is quoted so multi-word values survive: bare
+            # Each language is quoted so multi-word values survive: bare
             # `language:Jupyter Notebook` is parsed by GitHub as
             # `language:Jupyter` plus a free-text `Notebook`.
-            f'language:"{params.language}"',
+            *(f'language:"{language}"' for language in languages),
             label,
             "state:open",
             "no:assignee",
@@ -72,6 +73,7 @@ def register(mcp: MCPServer) -> None:
         return json.dumps({
             "total_found": result.get("total_count", 0),
             "language": params.language,
+            "languages": languages,
             "issues": issues,
             "difficulty": params.difficulty,
         }, indent=2)

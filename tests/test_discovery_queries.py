@@ -63,6 +63,18 @@ async def test_find_issues_quotes_single_word_language(server, captured_queries)
 
 
 @pytest.mark.asyncio
+async def test_find_issues_quotes_multiple_languages(server, captured_queries):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python, TypeScript"}},
+    )
+
+    assert 'language:"Python"' in captured_queries[0]
+    assert 'language:"TypeScript"' in captured_queries[0]
+
+
+@pytest.mark.asyncio
 async def test_match_me_quotes_detected_language(server, captured_queries, mock_github):
     mock_github({
         "/users/dataperson": {"login": "dataperson", "name": "Data Person"},
