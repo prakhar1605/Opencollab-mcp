@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an idea or a new tool for opencollab-mcp
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool it touches
+      description: The MCP tool this idea is about, if any.
+      placeholder: "e.g. search_issues"
+    validations:
+      required: false
