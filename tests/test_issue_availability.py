@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
 
 from opencollab_mcp.server import build_server
+
+
+def _days_ago_iso(days: int) -> str:
+    """ISO timestamp `days` ago, so staleness tests don't go stale as time passes."""
+    moment = datetime.now(timezone.utc) - timedelta(days=days)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 async def _check(issue_number: str = "7") -> dict[str, Any]:
@@ -268,7 +275,7 @@ async def test_recently_updated_assigned_issue_has_no_stale_warning(mock_github)
             "state": "open",
             "title": "Bug",
             "assignees": [{"login": "fast-dev"}],
-            "updated_at": "2026-10-10T00:00:00Z",
+            "updated_at": _days_ago_iso(1),
         },
     })
 
