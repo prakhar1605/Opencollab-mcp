@@ -147,3 +147,62 @@ async def test_match_me_counts_owned_repositories_not_disk_size(
         {"name": "Python", "percentage": 16.7},
     ]
     assert calls == {"get": 2, "search": 1}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("public_repos", [40, 100, 250])
+async def test_match_me_discloses_partial_repository_analysis(
+    server, no_search, mock_github, monkeypatch, public_repos
+):
+    returned = min(public_repos, 100)
+    # Forks count towards public_repos and the API page size, even though
+    # language analysis ignores them.
+    repos = [
+        {"language": "Python", "fork": i % 2 == 0, "topics": []}
+        for i in range(returned)
+    ]
+    mock_github({
+        "/users/dev": {"login": "dev", "public_repos": public_repos},
+        "/users/dev/repos": repos,
+    })
+    calls = []
+    original_get = discovery.github_get
+
+    async def counted_get(*args, **kwargs):
+        calls.append(args)
+        return await original_get(*args, **kwargs)
+
+    monkeypatch.setattr(discovery, "github_get", counted_get)
+
+    payload = await _match_me(server, "dev")
+
+    assert len(calls) == 2, "disclosing truncation must not add pagination requests"
+    assert payload["matched_language"] == "Python"
+    if public_repos > returned:
+        assert payload["repos_analyzed"] == returned
+        assert payload["repos_total"] == public_repos
+        assert "100" in payload["note"]
+        assert "most recently pushed" in payload["note"]
+    else:
+        assert "repos_analyzed" not in payload
+        assert "repos_total" not in payload
+        assert "note" not in payload
+
+
+@pytest.mark.asyncio
+async def test_match_me_keeps_both_partial_analysis_and_language_fallback_notes(
+    server, no_search, mock_github
+):
+    mock_github({
+        "/users/dev": {"login": "dev", "public_repos": 250},
+        "/users/dev/repos": [{"fork": True, "language": "Rust"}] * 100,
+    })
+
+    payload = await _match_me(server, "dev")
+
+    assert payload["repos_analyzed"] == 100
+    assert payload["repos_total"] == 250
+    assert payload["language_fallback"] is True
+    assert "most recently pushed" in payload["note"]
+    assert "defaulted to Python" in payload["note"]
+    assert "opencollab_find_issues" in payload["note"]

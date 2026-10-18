@@ -92,6 +92,8 @@ def register(mcp: MCPServer) -> None:
 
         Detects the user's primary language and returns up to `limit`
         (default 10, max 30) matching unassigned issues from non-archived repos.
+        Scans up to 100 most recently pushed repositories. If more exist,
+        returns repos_analyzed, repos_total and a note about the partial scan.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -163,15 +165,30 @@ def register(mcp: MCPServer) -> None:
             "matched_issues": issues,
             "difficulty": params.difficulty,
         }
+        notes = []
+        repos_analyzed = len(repos_raw)
+        repos_total = user.get("public_repos", repos_analyzed)
+        if repos_total > repos_analyzed:
+            # public_repos includes forks, so compare against the raw page,
+            # before excluding forks from language analysis.
+            payload["repos_analyzed"] = repos_analyzed
+            payload["repos_total"] = repos_total
+            notes.append(
+                f"Only the {repos_analyzed} most recently pushed repositories "
+                f"out of {repos_total} public repositories were scanned. "
+                "Language analysis is based on this partial sample."
+            )
         if not language_detected:
             # Present only when the fallback fired, so its presence is the
             # signal — an assistant reading the response cannot miss it the way
             # it can miss a null.
             payload["language_fallback"] = True
-            payload["note"] = (
+            notes.append(
                 "No language data was found on this profile, so the search "
                 "defaulted to Python. These matches are not based on the "
                 "user's actual skills. Ask the user which language they want "
                 "and call opencollab_find_issues with it."
             )
+        if notes:
+            payload["note"] = " ".join(notes)
         return json.dumps(payload, indent=2)
