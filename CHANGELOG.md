@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- Contributors section in the README ([#187](https://github.com/prakhar1605/Opencollab-mcp/pull/187)) and an `.editorconfig` ([#188](https://github.com/prakhar1605/Opencollab-mcp/pull/188))
 - `language` accepts up to three comma-separated languages for `opencollab_find_issues`; the response adds a `languages` list ([#165](https://github.com/prakhar1605/Opencollab-mcp/pull/165))
 - A workflow publishes the Docker image to GitHub Container Registry on `v*` tags ([#164](https://github.com/prakhar1605/Opencollab-mcp/pull/164))
 - `opencollab_generate_pr_plan` includes the repository's PR template ([#150](https://github.com/prakhar1605/Opencollab-mcp/pull/150))
@@ -50,6 +51,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Date-dependent tests are now relative to the current time, so they no longer fail as the calendar moves on ([#196](https://github.com/prakhar1605/Opencollab-mcp/pull/196))
 - Transient GitHub server failures are retried once ([#158](https://github.com/prakhar1605/Opencollab-mcp/pull/158))
 - `check_issue_availability` explains why a closed issue is unavailable ([#160](https://github.com/prakhar1605/Opencollab-mcp/pull/160))
 - Archived repositories are excluded from issue discovery ([#161](https://github.com/prakhar1605/Opencollab-mcp/pull/161))
