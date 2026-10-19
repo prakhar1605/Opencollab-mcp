@@ -9,11 +9,19 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+
+
+def _days_ago_iso(days: int) -> str:
+    """ISO timestamp `days` ago, so scoring tests don't go stale as time passes."""
+    moment = datetime.now(timezone.utc) - timedelta(days=days)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 EXPECTED_TOOL_NAMES = {
     # Discovery (2)
@@ -164,7 +172,7 @@ async def test_repo_health_scores_when_community_profile_is_not_found(mock_githu
     """A missing community profile should not hide the rest of the health score."""
     mock_github({
         "/repos/o/r": {
-            "pushed_at": "2026-09-25T00:00:00Z",
+            "pushed_at": _days_ago_iso(20),
             "stargazers_count": 20,
             "open_issues_count": 7,
             "forks_count": 5,
@@ -203,7 +211,7 @@ async def test_repo_health_reports_archived_status(mock_github, archived, merged
         repo["archived"] = archived
     mock_github({
         "/repos/o/r": repo,
-        "/repos/o/r/pulls": [{"merged_at": "2026-10-01T00:00:00Z"}] if merged else [],
+        "/repos/o/r/pulls": [{"merged_at": _days_ago_iso(10)}] if merged else [],
         "/repos/o/r/community/profile": {
             "files": {key: {} for key in [
                 "contributing", "code_of_conduct", "license", "readme", "issue_template",
@@ -281,7 +289,7 @@ async def test_repo_health_score_calculation(mock_github):
     """Verify repo_health scoring on an active repo and an abandoned repo."""
     mock_github({
         "/repos/active/project": {
-            "pushed_at": "2026-10-09T00:00:00Z",  # <= 7 days: +20
+            "pushed_at": _days_ago_iso(2),  # <= 7 days: +20
             "stargazers_count": 1500,  # >= 1000: +15
             "forks_count": 150,  # >= 100: +10
             "open_issues_count": 50,  # 5..500: +10
@@ -291,8 +299,8 @@ async def test_repo_health_score_calculation(mock_github):
             "archived": False,
         },
         "/repos/active/project/pulls": [
-            {"merged_at": "2026-10-08T00:00:00Z"},
-            {"merged_at": "2026-10-07T00:00:00Z"},
+            {"merged_at": _days_ago_iso(3)},
+            {"merged_at": _days_ago_iso(4)},
         ],  # 2/2 merged = 100% (>= 60): +20
         "/repos/active/project/community/profile": {
             "files": {
