@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), linked from the README ([#198](https://github.com/prakhar1605/Opencollab-mcp/pull/198))
 - GitHub issue forms for bug reports and feature requests ([#189](https://github.com/prakhar1605/Opencollab-mcp/pull/189))
 - Pull request template ([#199](https://github.com/prakhar1605/Opencollab-mcp/pull/199))
 - Claude Code install instructions (`claude mcp add`) in the README ([#192](https://github.com/prakhar1605/Opencollab-mcp/pull/192))
