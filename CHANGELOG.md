@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- Pull request template ([#199](https://github.com/prakhar1605/Opencollab-mcp/pull/199))
 - Claude Code install instructions (`claude mcp add`) in the README ([#192](https://github.com/prakhar1605/Opencollab-mcp/pull/192))
 - A test that checks all six tools are registered with read-only annotations ([#193](https://github.com/prakhar1605/Opencollab-mcp/pull/193))
 - Contributors section in the README ([#187](https://github.com/prakhar1605/Opencollab-mcp/pull/187)) and an `.editorconfig` ([#188](https://github.com/prakhar1605/Opencollab-mcp/pull/188))
