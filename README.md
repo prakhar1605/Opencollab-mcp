@@ -1,378 +1,933 @@
+\n> **Example note:** The JSON snippets below show the response shape and are illustrative, not captured live responses. Before submitting this issue, replace each snippet with a trimmed response copied from a real tool call, as requested in issue #186.
+
 <div align="center">
+
+
 
 # OpenCollab MCP
 
+
+
 **Find your next open source contribution from your AI chat.**
 
+
+
 [![PyPI version](https://img.shields.io/pypi/v/opencollab-mcp.svg?color=blue)](https://pypi.org/project/opencollab-mcp/)
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 [![CI](https://github.com/prakhar1605/Opencollab-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/prakhar1605/Opencollab-mcp/actions/workflows/ci.yml)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+
 
 6 focused tools. Works with Claude Desktop, Cursor, VS Code, or any MCP-compatible client.
 
+
+
 [Changelog](CHANGELOG.md)
+
+
 
 </div>
 
+
+
 ---
 
-## What it does
+
+
+**## What it does**
+
+
 
 You ask your AI assistant something like:
 
-> *"My GitHub is `@octocat`. Find me a good first issue I can actually pick up — make sure nobody's already working on it."*
+
+
+> **"My GitHub is&#x20;*`@octocat`*. Find me a good first issue I can actually pick up — make sure nobody's already working on it."**
+
+
 
 OpenCollab gives the AI 6 tools that read the GitHub API. The AI uses them to:
 
-1. **Find** issues matched to your skills.
-2. **Evaluate** whether the repo is worth your time.
-3. **Verify** the issue isn't already claimed.
-4. **Plan** the PR with full context.
 
-That's the whole loop: **find → evaluate → verify → plan**. OpenCollab does not generate text. Your AI client does the thinking; OpenCollab just gives it clean, real-time GitHub data.
 
-> **v0.6.0 — relaunched lean.** Previous versions exposed 22 tools. Most went unused, and big tool lists hurt LLM routing. This release ships the 6 that earn their keep. The full 22-tool version is preserved on the [`v1-full`](https://github.com/prakhar1605/Opencollab-mcp/tree/v1-full) branch.
+1. ****Find**** issues matched to your skills.
+
+2. ****Evaluate**** whether the repo is worth your time.
+
+3. ****Verify**** the issue isn't already claimed.
+
+4. ****Plan**** the PR with full context.
+
+
+
+That's the whole loop: ****find → evaluate → verify → plan****. OpenCollab does not generate text. Your AI client does the thinking; OpenCollab just gives it clean, real-time GitHub data.
+
+
+
+> ****v0.6.0 — relaunched lean.**** Previous versions exposed 22 tools. Most went unused, and big tool lists hurt LLM routing. This release ships the 6 that earn their keep. The full 22-tool version is preserved on the [`v1-full`](https://github.com/prakhar1605/Opencollab-mcp/tree/v1-full) branch.
+
+
 
 ---
 
-## Quick start
 
-### Step 1 — Get a GitHub token
 
-Go to [github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)** → tick `public_repo` → copy the token (it starts with `ghp_`).
+**## Quick start**
 
-### Step 2 — Add it to your AI client
+
+
+**### Step 1 — Get a GitHub token**
+
+
+
+Go to [github.com/settings/tokens](https://github.com/settings/tokens) → ****Generate new token (classic)**** → tick `public_repo` → copy the token (it starts with `ghp_`).
+
+
+
+**### Step 2 — Add it to your AI client**
+
+
 
 <details open>
+
 <summary><b>Claude Desktop</b> (recommended)</summary>
+
+
 
 Open your config file:
 
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+
+- ****macOS:**** `\~/Library/Application Support/Claude/claude_desktop_config.json`
+
+- ****Windows:**** `%APPDATA%\Claude\claude_desktop_config.json`
+
+
 
 Paste this (replace `your_token_here` with the token from Step 1):
 
+
+
 ```json
+
 {
-  "mcpServers": {
-    "opencollab": {
-      "command": "uvx",
-      "args": ["opencollab-mcp"],
-      "env": {
-        "GITHUB_TOKEN": "your_token_here"
-      }
-    }
-  }
+
+  *"mcpServers"*: {
+
+    *"opencollab"*: {
+
+      *"command"*: "uvx",
+
+      *"args"*: ["opencollab-mcp"],
+
+      *"env"*: {
+
+        *"GITHUB_TOKEN"*: "your_token_here"
+
+      }
+
+    }
+
+  }
+
 }
+
 ```
+
+
 
 Restart Claude Desktop. You're done.
 
+
+
 > Requires [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS, `pipx install uv` elsewhere). `uvx` will pull `opencollab-mcp` from PyPI on first launch.
+
+
 
 </details>
 
+
+
 <details>
+
 <summary><b>Cursor / VS Code</b></summary>
+
+
 
 Same JSON as above, but in your client's MCP config file (`.cursor/mcp.json` for Cursor).
 
+
+
 </details>
 
+
+
 <details>
+
 <summary><b>Plain pip (no uv)</b></summary>
 
+
+
 ```bash
+
 pip install opencollab-mcp
+
 ```
+
+
 
 Then in your client config, change `command` to the binary that pip put on your PATH:
 
+
+
+```json
+
+{
+
+  *"mcpServers"*: {
+
+    *"opencollab"*: {
+
+      *"command"*: "opencollab-mcp",
+
+      *"env"*: {
+
+        *"GITHUB_TOKEN"*: "your_token_here"
+
+      }
+
+    }
+
+  }
+
+}
+
+```
+
+
+
+Note: if you switch Python versions or virtualenvs, the `opencollab-mcp` binary may disappear and you'll need to `pip install` again. `uvx` avoids this.
+
+
+
+</details>
+
+
+
+<details>
+
+<summary><b>Docker (for remote / streamable-HTTP setups)</b></summary>
+
+
+
+```bash
+
+docker build -t opencollab-mcp .
+
+docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
+
+```
+
+
+
+The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
+
+For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
+
+`0.0.0.0` and accept `PORT` (default `8000`).
+
+`GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
+
+
+
+</details>
+
+
+
+**### Step 3 — Try it**
+
+
+
+Open your AI client and ask:
+
+
+
+> **"My GitHub username is&#x20;*`<your-username>`*. Find me a good first issue I can pick up."**
+
+
+
+If the AI runs `opencollab_match_me` and comes back with a list, you're set.
+
+
+
+---
+
+
+
+**## What you can ask**
+
+
+
+These are real things the AI can answer once OpenCollab is connected:
+
+
+
+- **"My GitHub is&#x20;*`@octocat`*&#x20;— find me a good first issue."**
+
+- **"Find me a Python good-first-issue."**
+
+- **"How healthy is&#x20;*`pandas-dev/pandas`*? Is it worth contributing to?"**
+
+- **"What's the impact tier of contributing to&#x20;*`tensorflow/tensorflow`*?"**
+
+- **"Is issue #123 in&#x20;*`facebook/react`*&#x20;still available, or has someone claimed it?"**
+
+- **"Plan a PR for issue #456 in&#x20;*`owner/repo`*&#x20;— pull all the context the AI needs."**
+
+
+
+The AI picks which tools to call based on what you ask.
+
+
+
+---
+
+
+
+**## The 6 tools**
+
+
+
+<details open>
+
+<summary><b>Discovery</b> — find issues to work on</summary>
+
+
+
+| Tool | What it does |
+
+|---|---|
+
+| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
+
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
+
+
+
+
+<details>
+<summary><b>Example response — opencollab_match_me</b></summary>
+
+Input: `{"username":"octocat","difficulty":"beginner","limit":3}`
+
 ```json
 {
-  "mcpServers": {
-    "opencollab": {
-      "command": "opencollab-mcp",
-      "env": {
-        "GITHUB_TOKEN": "your_token_here"
-      }
+  "username": "octocat",
+  "name": "The Octocat",
+  "top_languages": [
+    {"name": "JavaScript", "percentage": 60.0},
+    {"name": "Ruby", "percentage": 40.0}
+  ],
+  "topics": ["octocat"],
+  "matched_language": "JavaScript",
+  "matched_issues": [
+    {
+      "title": "Example issue title",
+      "url": "https://github.com/owner/repo/issues/123",
+      "repo": "owner/repo",
+      "labels": ["good first issue"],
+      "comments": 2,
+      "body_preview": "Shortened issue description…"
+    }
+  ],
+  "difficulty": "beginner"
+}
+```
+
+</details>
+
+<details>
+<summary><b>Example response — opencollab_find_issues</b></summary>
+
+Input: `{"language":"Python","difficulty":"beginner","limit":3,"max_age_days":90}`
+
+```json
+{
+  "total_found": 1,
+  "language": "Python",
+  "languages": ["Python"],
+  "issues": [
+    {
+      "title": "Example issue title",
+      "url": "https://github.com/owner/repo/issues/123",
+      "repo": "owner/repo",
+      "labels": ["good first issue"],
+      "comments": 1,
+      "created_days_ago": 12,
+      "body_preview": "Shortened issue description…"
+    }
+  ],
+  "difficulty": "beginner"
+}
+```
+
+</details>
+
+</details>
+
+
+
+<details open>
+
+<summary><b>Evaluation</b> — score a repo before you invest time</summary>
+
+
+
+| Tool | What it does |
+
+|---|---|
+
+| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
+
+| `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
+
+
+
+
+<details>
+<summary><b>Example response — opencollab_repo_health</b></summary>
+
+Input: `{"owner":"octocat","repo":"Hello-World"}`
+
+```json
+{
+  "repo": "octocat/Hello-World",
+  "health_score": 72,
+  "verdict": "Good — solid project to contribute to",
+  "details": {
+    "archived": false,
+    "last_push_days_ago": 30,
+    "stars": 100,
+    "bot_prs_excluded": 1,
+    "pr_merge_rate_pct": 65.0,
+    "has_issues": true,
+    "open_issues": 8,
+    "community_profile_available": true,
+    "community_files": {
+      "contributing": true,
+      "code_of_conduct": true,
+      "license": true,
+      "readme": true,
+      "issue_template": false,
+      "pull_request_template": false
     }
   }
 }
 ```
 
-Note: if you switch Python versions or virtualenvs, the `opencollab-mcp` binary may disappear and you'll need to `pip install` again. `uvx` avoids this.
+</details>
+
+<details>
+<summary><b>Example response — opencollab_impact_estimator</b></summary>
+
+Input: `{"owner":"octocat","repo":"Hello-World"}`
+
+```json
+{
+  "repo": "octocat/Hello-World",
+  "archived": false,
+  "impact_tier": "LOW",
+  "estimated_reach": "a growing community",
+  "stars": 100,
+  "forks": 20,
+  "watchers": 10,
+  "open_issues": 8,
+  "visibility_score": 10,
+  "suggested_resume_line": "Open-source contributor to octocat/Hello-World — My first repository on GitHub",
+  "topics": []
+}
+```
+
+</details>
+
+</details>
+
+
+
+<details open>
+
+<summary><b>Issue intelligence</b> — verify and plan a specific issue</summary>
+
+
+
+| Tool | What it does |
+
+|---|---|
+
+| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
+
+| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, PR template preview (`null` when unavailable), and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
+
+
+
+
+<details>
+<summary><b>Example response — opencollab_check_issue_availability</b></summary>
+
+Input: `{"owner":"octocat","repo":"Hello-World","issue_number":"1"}`
+
+```json
+{
+  "available": true,
+  "reason": "No assignee, blocking label, or linked open/merged PR was found",
+  "issue_title": "Example issue title",
+  "labels": [],
+  "linked_prs": [],
+  "linked_prs_checked": true
+}
+```
 
 </details>
 
 <details>
-<summary><b>Docker (for remote / streamable-HTTP setups)</b></summary>
+<summary><b>Example response — opencollab_generate_pr_plan</b></summary>
 
-```bash
-docker build -t opencollab-mcp .
-docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
+Input: `{"owner":"octocat","repo":"Hello-World","issue_number":"1"}`
+
+```json
+{
+  "repo": "octocat/Hello-World",
+  "primary_language": "JavaScript",
+  "default_branch": "master",
+  "issue": {
+    "number": 1,
+    "title": "Example issue title",
+    "body": "Shortened issue description…",
+    "body_truncated": false,
+    "body_length": 45,
+    "labels": ["good first issue"],
+    "state": "open",
+    "author": "octocat",
+    "created_days_ago": 12,
+    "comments_count": 2
+  },
+  "comments": [
+    {
+      "author": "octocat",
+      "body": "Shortened maintainer comment…",
+      "created_days_ago": 3
+    }
+  ],
+  "bot_comments_skipped": 1,
+  "contributing_guidelines_preview": "Shortened CONTRIBUTING.md content…",
+  "pr_template_preview": null,
+  "repo_root_files": [
+    {"name": "README.md", "type": "file"},
+    {"name": "src", "type": "dir"}
+  ]
+}
 ```
 
-The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
-For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
-`0.0.0.0` and accept `PORT` (default `8000`).
-`GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
+</details>
 
 </details>
 
-### Step 3 — Try it
 
-Open your AI client and ask:
-
-> *"My GitHub username is `<your-username>`. Find me a good first issue I can pick up."*
-
-If the AI runs `opencollab_match_me` and comes back with a list, you're set.
 
 ---
 
-## What you can ask
 
-These are real things the AI can answer once OpenCollab is connected:
 
-- *"My GitHub is `@octocat` — find me a good first issue."*
-- *"Find me a Python good-first-issue."*
-- *"How healthy is `pandas-dev/pandas`? Is it worth contributing to?"*
-- *"What's the impact tier of contributing to `tensorflow/tensorflow`?"*
-- *"Is issue #123 in `facebook/react` still available, or has someone claimed it?"*
-- *"Plan a PR for issue #456 in `owner/repo` — pull all the context the AI needs."*
+**## How it works**
 
-The AI picks which tools to call based on what you ask.
 
----
-
-## The 6 tools
-
-<details open>
-<summary><b>Discovery</b> — find issues to work on</summary>
-
-| Tool | What it does |
-|---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
-
-</details>
-
-<details open>
-<summary><b>Evaluation</b> — score a repo before you invest time</summary>
-
-| Tool | What it does |
-|---|---|
-| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
-| `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
-
-</details>
-
-<details open>
-<summary><b>Issue intelligence</b> — verify and plan a specific issue</summary>
-
-| Tool | What it does |
-|---|---|
-| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
-| `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, PR template preview (`null` when unavailable), and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
-
-</details>
-
----
-
-## How it works
 
 ```
+
 You ask Claude → Claude picks tools → OpenCollab hits GitHub API → JSON back to Claude → Claude answers in plain English
+
 ```
+
+
 
 A few design choices worth knowing:
 
-- **No AI inference on our end.** OpenCollab is a thin wrapper over the GitHub REST API. Your AI client (Claude / Cursor / etc.) does all the reasoning. Cost to run OpenCollab: $0.
-- **Runs locally by default.** Stdio transport — no servers, no telemetry. Your token never leaves your machine.
-- **5-minute in-memory cache.** Repeat lookups in the same conversation don't re-hit GitHub. Helps stay under rate limits.
-- **Parallel API calls.** The heavy tools (`match_me`, `repo_health`, `generate_pr_plan`) fan out their GitHub requests with `asyncio.gather`, so they're noticeably faster than sequential.
-- **Pydantic-validated inputs.** Every tool input is a Pydantic model with `extra="forbid"`. Catches stray fields from LLM-generated tool calls before any logic runs.
+
+
+- ****No AI inference on our end.**** OpenCollab is a thin wrapper over the GitHub REST API. Your AI client (Claude / Cursor / etc.) does all the reasoning. Cost to run OpenCollab: $0.
+
+- ****Runs locally by default.**** Stdio transport — no servers, no telemetry. Your token never leaves your machine.
+
+- ****5-minute in-memory cache.**** Repeat lookups in the same conversation don't re-hit GitHub. Helps stay under rate limits.
+
+- ****Parallel API calls.**** The heavy tools (`match_me`, `repo_health`, `generate_pr_plan`) fan out their GitHub requests with `asyncio.gather`, so they're noticeably faster than sequential.
+
+- ****Pydantic-validated inputs.**** Every tool input is a Pydantic model with `extra="forbid"`. Catches stray fields from LLM-generated tool calls before any logic runs.
+
+
 
 ---
 
-## Authentication & rate limits
+
+
+**## Authentication & rate limits**
+
+
 
 The server uses `GITHUB_TOKEN` when non-empty, otherwise it falls back to
+
 `GH_TOKEN` (also used by the GitHub CLI). Surrounding whitespace is stripped
+
 from either value; when neither provides a token, requests are unauthenticated.
+
+
 
 OpenCollab needs a GitHub token for two reasons:
 
-1. **Higher rate limit.** Authenticated requests get 5,000/hour vs 60/hour unauthenticated.
-2. **Some endpoints need auth.** A few tools (`/timeline`, etc.) may not work without it.
+
+
+1. ****Higher rate limit.**** Authenticated requests get 5,000/hour vs 60/hour unauthenticated.
+
+2. ****Some endpoints need auth.**** A few tools (`/timeline`, etc.) may not work without it.
+
+
 
 Scopes needed: just `public_repo`. OpenCollab never writes anything — it's all reads.
 
+
+
 ---
 
-## Troubleshooting
 
-### Which version am I running?
+
+**## Troubleshooting**
+
+
+
+**### Which version am I running?**
+
+
 
 ```bash
-opencollab-mcp --version   # or: opencollab-mcp -V
+
+opencollab-mcp --version   # or: opencollab-mcp -V
+
 ```
+
+
 
 Include this output when you report a bug. If the flag isn't recognised, you're on an older release; upgrade (see the next item).
 
-### `uvx` keeps running an old version
+
+
+**###&#x20;**`uvx`**&#x20;keeps running an old version**
+
+
 
 `uvx` caches packages, so it can keep using a stale copy. Force the newest release with either:
 
+
+
 ```bash
+
 uvx --refresh opencollab-mcp
-uvx opencollab-mcp@latest
+
+uvx opencollab-mcp\@latest
+
 ```
 
-In an MCP client config, use `"args": ["--refresh", "opencollab-mcp"]` (or `"opencollab-mcp@latest"`).
 
-### Rate-limit errors
+
+In an MCP client config, use `"args": ["--refresh", "opencollab-mcp"]` (or `"opencollab-mcp\@latest"`).
+
+
+
+**### Rate-limit errors**
+
+
 
 Symptom: a tool returns
 
+
+
 ```
-Error: GitHub API rate limit exceeded. Resets in ~N minutes. Set GITHUB_TOKEN for a 5,000 requests/hour limit.
+
+Error: GitHub API rate limit exceeded. Resets in \~N minutes. Set GITHUB_TOKEN for a 5,000 requests/hour limit.
+
 ```
+
+
 
 Fix: set `GITHUB_TOKEN` (see [Authentication & rate limits](#authentication--rate-limits)). Without a token you get 60 requests/hour; with one, 5,000. If the token is already set, restart your MCP client so it picks up the environment variable.
 
-### Docker container shows "unhealthy"
+
+
+**### Docker container shows "unhealthy"**
+
+
 
 The health check calls `/health` on `PORT` inside the container. Check that:
 
+
+
 1. `PORT` matches the port you publish. If you set `-e PORT=9000`, publish `-p 9000:9000`.
+
 2. `/health` responds:
 
-   ```bash
-   curl localhost:8000/health   # expected output: ok
-   ```
+
+
+   ```bash
+
+   curl localhost:8000/health   # expected output: ok
+
+   ```
+
+
 
 3. The container is running in HTTP mode (`TRANSPORT=streamable-http`, the image default). In `stdio` mode there is no `/health` endpoint.
 
-### Where are the logs?
 
-Logs go to **stderr** (stdout is reserved for the MCP protocol in stdio mode). For more detail, set `OPENCOLLAB_LOG_LEVEL`:
+
+**### Where are the logs?**
+
+
+
+Logs go to ****stderr**** (stdout is reserved for the MCP protocol in stdio mode). For more detail, set `OPENCOLLAB_LOG_LEVEL`:
+
+
 
 ```bash
+
 OPENCOLLAB_LOG_LEVEL=DEBUG opencollab-mcp
+
 ```
+
+
 
 Valid levels: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`. In Docker, read them with `docker logs <container>`. Most MCP clients also keep a per-server log; check your client's MCP log viewer.
 
+
+
 ---
 
-## Develop
+
+
+**## Develop**
+
+
 
 ```bash
+
 git clone https://github.com/prakhar1605/Opencollab-mcp.git
+
 cd Opencollab-mcp
+
 pip install -e ".[dev]"
+
 export GITHUB_TOKEN="ghp_xxx"
 
+
+
 # Run the server (stdio mode, for piping into MCP clients)
+
 python -m opencollab_mcp
 
+
+
 # Run the test suite
+
 pytest -v
 
+
+
 # Lint
+
 ruff check src tests
 
+
+
 # Inspect interactively in the MCP Inspector
+
 npx @modelcontextprotocol/inspector python -m opencollab_mcp
-```
-
-### Project layout
 
 ```
+
+
+
+**### Project layout**
+
+
+
+```
+
 src/opencollab_mcp/
-├── server.py          # entry point, transport selection (stdio / HTTP / SSE)
-├── github_client.py   # cached httpx wrapper, friendly error mapping
-├── helpers.py         # date math, base64 decode, issue-number parser
-├── models.py          # Pydantic input models
-├── constants.py       # scoring thresholds & magic numbers
-└── tools/
-    ├── discovery.py   # 2 tools — finding issues
-    ├── evaluation.py  # 2 tools — scoring a repo
-    └── issues.py      # 2 tools — verifying & planning an issue
 
-tests/                 # pytest suite
+├── server.py          # entry point, transport selection (stdio / HTTP / SSE)
+
+├── github_client.py   # cached httpx wrapper, friendly error mapping
+
+├── helpers.py         # date math, base64 decode, issue-number parser
+
+├── models.py          # Pydantic input models
+
+├── constants.py       # scoring thresholds & magic numbers
+
+└── tools/
+
+    ├── discovery.py   # 2 tools — finding issues
+
+    ├── evaluation.py  # 2 tools — scoring a repo
+
+    └── issues.py      # 2 tools — verifying & planning an issue
+
+
+
+tests/                 # pytest suite
+
 ```
 
-### Contributing
 
-Issues and PRs are welcome. The codebase is small (~1000 lines) and intentionally easy to read. Every scoring threshold lives in `constants.py` so tuning is a one-line change. New tools follow the same pattern: a function in `tools/<category>.py`, a Pydantic input model in `models.py`, and a test in `tests/test_tools.py`.
+
+**### Contributing**
+
+
+
+Issues and PRs are welcome. The codebase is small (\~1000 lines) and intentionally easy to read. Every scoring threshold lives in `constants.py` so tuning is a one-line change. New tools follow the same pattern: a function in `tools/<category>.py`, a Pydantic input model in `models.py`, and a test in `tests/test_tools.py`.
+
+
 
 When reporting bugs or submitting issues, please include the version of `opencollab-mcp` you are running (especially when using `uvx` caches):
 
+
+
 ```bash
+
 opencollab-mcp --version
+
 ```
-*(or `opencollab-mcp -V`)*
+
+**(or&#x20;*`opencollab-mcp -V`*)**
+
+
 
 The `main` branch is protected — please open a PR rather than pushing directly. CI runs on Python 3.10, 3.11, 3.12, and 3.13.
 
+
+
 ---
 
-## Roadmap
+
+
+**## Roadmap**
+
+
+
 
 
 Already shipped (v0.6.0):
 
+
+
 - 6 focused tools across discovery, evaluation, and issue intelligence
+
 - PyPI release (`pip install opencollab-mcp` / `uvx opencollab-mcp`)
+
 - 5-minute in-memory cache + parallel API calls
+
 - pytest suite on Python 3.10/3.11/3.12/3.13 in CI
+
 - Stdio (local) and streamable-HTTP (remote) transports
+
 - Branch protection + required CI checks on `main`
+
+
 
 Merged since v0.6.1 (see the [Changelog](CHANGELOG.md)):
 
+
+
 - Migrated to the MCP 2.x server API
+
 - `GET /health` endpoint for the HTTP transports, used by the Docker `HEALTHCHECK`
+
 - Validated tool inputs: GitHub usernames, repo names and issue numbers are checked before any request
+
+
 
 Open ideas:
 
+
+
 - `first_pr_generator` — chain `match_me` + `check_issue_availability` + `generate_pr_plan` into one prompt
+
 - `track_my_prs` — list your open PRs with staleness nudges
+
 - `skill_gap` — compare your skills to a repo's tech stack and tell you what to learn
+
+
 
 If any of these sound interesting, [open an issue](https://github.com/prakhar1605/Opencollab-mcp/issues/new) — that's the fastest path in.
 
+
+
 ---
 
-## Why only 6 tools?
+
+
+**## Why only 6 tools?**
+
+
 
 Earlier versions shipped 22. In practice:
 
+
+
 - LLMs route worse with crowded tool lists — they pick generic tools and miss the killer ones.
+
 - Most of the 22 overlapped (5 different "find issues" variants, 3 different "score this repo" variants).
-- The 6 that survive form a clean story: **find → evaluate → verify → plan**.
+
+- The 6 that survive form a clean story: ****find → evaluate → verify → plan****.
+
+
 
 The full 22-tool catalogue still lives on the [`v1-full`](https://github.com/prakhar1605/Opencollab-mcp/tree/v1-full) branch if you want it.
 
+
+
 ---
 
-## Contributors
+
+
+**## Contributors**
+
+
 
 <a href="https://github.com/prakhar1605/Opencollab-mcp/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=prakhar1605/Opencollab-mcp" alt="Contributors" />
+
+  <img src="https://contrib.rocks/image?repo=prakhar1605/Opencollab-mcp" alt="Contributors" />
+
 </a>
+
+
 
 New to open source? Start with an open [good first issue](https://github.com/prakhar1605/Opencollab-mcp/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22).
 
+
+
 ---
 
-## License
+
+
+**## License**
+
+
 
 [MIT](LICENSE) — built by [Prakhar Pandey](https://github.com/prakhar1605), IIT Guwahati.
+
+
 
 If OpenCollab helps you land your first PR, a ⭐ on the repo would mean a lot.
