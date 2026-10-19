@@ -82,6 +82,25 @@ Same JSON as above, but in your client's MCP config file (`.cursor/mcp.json` for
 </details>
 
 <details>
+<summary><b>Claude Code</b></summary>
+
+Run this in your terminal (replace `ghp_your_token_here` with the token from Step 1):
+
+```bash
+claude mcp add opencollab -e GITHUB_TOKEN=ghp_your_token_here -- uvx opencollab-mcp
+```
+
+Check it's connected:
+
+```bash
+claude mcp list
+```
+
+Or run `/mcp` inside a Claude Code session.
+
+</details>
+
+<details>
 <summary><b>Plain pip (no uv)</b></summary>
 
 ```bash
