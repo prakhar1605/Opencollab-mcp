@@ -117,3 +117,56 @@ class TestDecodeBase64:
 
     def test_empty_content(self):
         assert decode_base64_content({"encoding": "base64", "content": ""}) == ""
+
+
+class TestParseGitHubURL:
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://github.com/owner/repo", ("owner", "repo", None)),
+            ("https://github.com/owner/repo/", ("owner", "repo", None)),
+            ("http://github.com/owner/repo", ("owner", "repo", None)),
+            ("https://www.github.com/owner/repo", ("owner", "repo", None)),
+            ("http://www.github.com/Owner/repo.name", ("Owner", "repo.name", None)),
+            ("https://GITHUB.COM/owner/repo", ("owner", "repo", None)),
+            ("https://github.com/owner/repo/issues/123", ("owner", "repo", 123)),
+            ("https://github.com/owner/repo/pull/456/", ("owner", "repo", 456)),
+            ("https://github.com/owner/repo/issues/123?tab=x#comment", ("owner", "repo", 123)),
+            ("https://github.com/owner/repo?tab=x#readme", ("owner", "repo", None)),
+        ],
+    )
+    def test_supported_urls(self, url, expected):
+        from opencollab_mcp import helpers
+
+        assert helpers.parse_github_url(url) == expected
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com.evil.example/owner/repo",
+            "https://evil.example/owner/repo",
+            "https://github.com@evil.example/owner/repo",
+            "https://user@github.com/owner/repo",
+            "ftp://github.com/owner/repo",
+            "github.com/owner/repo",
+            "https://github.com/",
+            "https://github.com/owner",
+            "https://github.com//repo",
+            "https://github.com/owner/repo/issues/abc",
+            "https://github.com/owner/repo/issues/0",
+            "https://github.com/owner/repo/issues/-1",
+            "https://github.com/owner/repo/issues/²",
+            "https://github.com/owner/repo/issues/123/extra",
+            "https://github.com/owner/repo/tree/main",
+            "https://github.com/owner/repo/issues/",
+            "https://github.com/owner/repo//",
+            "https://github.com/owner/..",
+            "https://github.com/owner/re%2Fpo",
+            "https://git\nhub.com/owner/repo",
+        ],
+    )
+    def test_rejects_ambiguous_or_invalid_urls(self, url):
+        from opencollab_mcp import helpers
+
+        with pytest.raises(ValueError):
+            helpers.parse_github_url(url)

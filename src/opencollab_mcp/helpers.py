@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import base64 as _base64
+import re
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 
 def difficulty_label(difficulty: str) -> str:
@@ -47,10 +49,40 @@ def parse_issue_number(raw: str) -> int:
     return int(cleaned)
 
 
+def parse_github_url(url: str) -> tuple[str, str, int | None]:
+    """Parse a GitHub repository, issue or pull URL without making a request.
+
+    Accept HTTP(S), optional www, one trailing slash, query and fragment.
+    Reject userinfo, ports and extra path components rather than guessing.
+    """
+    if not isinstance(url, str) or any(char.isspace() or ord(char) < 32 for char in url):
+        raise ValueError("Expected a GitHub HTTP(S) URL")
+    parsed = urlsplit(url)
+    if parsed.scheme not in ("http", "https") or parsed.netloc.lower() not in (
+        "github.com",
+        "www.github.com",
+    ):
+        raise ValueError("Expected a GitHub HTTP(S) URL")
+    path = parsed.path.removesuffix("/")
+    parts = path.split("/")
+    if len(parts) not in (3, 5) or parts[0] != "":
+        raise ValueError("Expected a repository, issue or pull URL")
+    owner, repo = parts[1:3]
+    if (
+        not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", owner)
+        or not re.fullmatch(r"[A-Za-z0-9._-]+", repo)
+        or repo in (".", "..")
+    ):
+        raise ValueError("Invalid GitHub owner or repository")
+    if len(parts) == 3:
+        return owner, repo, None
+    if parts[3] not in ("issues", "pull"):
+        raise ValueError("Expected an issue or pull URL")
+    return owner, repo, parse_issue_number(parts[4])
+
+
 def decode_base64_content(content_obj: dict) -> str:
     """Decode a GitHub contents-API base64 blob to UTF-8 text."""
     if content_obj.get("encoding") != "base64":
         return ""
-    return _base64.b64decode(content_obj.get("content", "")).decode(
-        "utf-8", errors="replace"
-    )
+    return _base64.b64decode(content_obj.get("content", "")).decode("utf-8", errors="replace")
