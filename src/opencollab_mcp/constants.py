@@ -20,6 +20,7 @@ except PackageNotFoundError:
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
 GITHUB_RETRY_DELAY_SECONDS = 1.0
+GITHUB_DEFAULT_MAX_PAGES = 5
 USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"
 GITHUB_RATE_LIMIT_WARNING_THRESHOLD = 10
@@ -47,6 +48,7 @@ WARNING_ISSUE_LABELS = frozenset({
 # ---- PR planning previews ----
 PR_PLAN_ISSUE_BODY_LIMIT = 1500
 LINKED_PRS_GRAPHQL_LIMIT = 20
+TIMELINE_MAX_PAGES = 5
 
 # ---- Search windows (days) ----
 RECENT_ISSUES_DAYS = 90

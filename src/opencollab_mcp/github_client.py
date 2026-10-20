@@ -14,6 +14,7 @@ import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -23,6 +24,7 @@ from .constants import (
     DEFAULT_TIMEOUT,
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
+    GITHUB_DEFAULT_MAX_PAGES,
     GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
     GITHUB_RETRY_DELAY_SECONDS,
     USER_AGENT,
@@ -129,6 +131,61 @@ def _get_headers() -> dict[str, str]:
     return headers
 
 
+def _validate_api_url(url: str) -> None:
+    """Ensure `url` targets `GITHUB_API_BASE` before sending auth headers."""
+    expected = urlsplit(GITHUB_API_BASE)
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme.lower() != expected.scheme.lower()
+        or parsed.netloc.lower() != expected.netloc.lower()
+    ):
+        raise ValueError(
+            f"Refusing to send GitHub API request to untrusted URL: {url!r}"
+        )
+
+
+async def _request(
+    url: str,
+    params: dict[str, Any] | None = None,
+    *,
+    label: str | None = None,
+) -> tuple[Any, bool, httpx.Response]:
+    """Perform a single authenticated GET with retry, rate-limit check, and JSON parsing.
+
+    Returns `(data, cacheable, response)`. HTTP 202 (stats still computing) and
+    non-JSON bodies return `({}, False, response)` so callers degrade gracefully
+    without caching transient placeholders.
+    """
+    _validate_api_url(url)
+    target = label or url
+
+    for attempt in range(2):
+        req_kwargs: dict[str, Any] = {"headers": _get_headers()}
+        if params is not None:
+            req_kwargs["params"] = params
+        resp = await _get_client().get(url, **req_kwargs)
+        if resp.status_code not in (502, 503, 504) or attempt == 1:
+            break
+        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+
+    resp.raise_for_status()
+    _check_rate_limit(resp)
+
+    # GitHub returns 202 with empty body while it computes statistics
+    # (commit_activity, participation, contributors on cold repos).
+    if resp.status_code == 202:
+        logger.info("GitHub returned 202 (stats computing) for %s", target)
+        return {}, False, resp
+
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.warning("Non-JSON response from %s", target)
+        return {}, False, resp
+
+    return data, True, resp
+
+
 async def github_get(
     path: str,
     params: dict[str, Any] | None = None,
@@ -146,34 +203,78 @@ async def github_get(
         if cached is not None:
             return cached
 
-    for attempt in range(2):
-        resp = await _get_client().get(
-            f"{GITHUB_API_BASE}{path}",
-            headers=_get_headers(),
-            params=params or {},
-        )
-        if resp.status_code not in (502, 503, 504) or attempt == 1:
-            break
-        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
-
-    resp.raise_for_status()
-    _check_rate_limit(resp)
-
-    # GitHub returns 202 with empty body while it computes statistics
-    # (commit_activity, participation, contributors on cold repos).
-    if resp.status_code == 202:
-        logger.info("GitHub returned 202 (stats computing) for %s", path)
-        return {}
-
-    try:
-        data = resp.json()
-    except ValueError:
-        logger.warning("Non-JSON response from %s", path)
-        return {}
-
-    if use_cache:
+    data, cacheable, _ = await _request(
+        f"{GITHUB_API_BASE}{path}",
+        params=params or {},
+        label=path,
+    )
+    if use_cache and cacheable:
         _cache_set(key, data)
     return data
+
+
+async def github_get_all(
+    path: str,
+    params: dict[str, Any] | None = None,
+    *,
+    max_pages: int = GITHUB_DEFAULT_MAX_PAGES,
+    use_cache: bool = True,
+) -> tuple[list[Any], bool]:
+    """Follow `Link: rel="next"` until exhausted or `max_pages`; return `(items, truncated)`.
+
+    Caches the assembled `(items, truncated)` snapshot under an isolated key so:
+    1. Repeated calls return a consistent snapshot without page-boundary drift.
+    2. Multi-page scans occupy one slot in `CACHE_MAX_ENTRIES` rather than `N`.
+    3. Single-page `github_get` calls on the same path never collide in shape.
+    """
+    if max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+
+    key = f"all:{max_pages}:{_cache_key(path, params)}"
+    if use_cache:
+        cached = _cache_get(key)
+        if cached is not None:
+            cached_items, cached_truncated = cached
+            return list(cached_items), cached_truncated
+
+    items: list[Any] = []
+    next_url: str | None = f"{GITHUB_API_BASE}{path}"
+    next_params: dict[str, Any] | None = params or {}
+    seen_urls: set[str] = set()
+    pages_fetched = 0
+    truncated = False
+    cacheable = True
+
+    while next_url is not None:
+        data, page_cacheable, resp = await _request(
+            next_url,
+            params=next_params,
+            label=path if pages_fetched == 0 else next_url,
+        )
+        pages_fetched += 1
+        next_params = None  # Subsequent `Link` URLs already carry query/cursor params.
+
+        if not page_cacheable or not isinstance(data, list):
+            cacheable = page_cacheable
+            break
+
+        items.extend(data)
+        raw_next = resp.links.get("next", {}).get("url")
+        candidate = raw_next if isinstance(raw_next, str) and raw_next else None
+
+        if candidate is None or candidate in seen_urls:
+            truncated = False
+            break
+        if pages_fetched >= max_pages:
+            truncated = True
+            break
+
+        seen_urls.add(candidate)
+        next_url = candidate
+
+    if use_cache and cacheable:
+        _cache_set(key, (list(items), truncated))
+    return items, truncated
 
 
 class GitHubGraphQLError(Exception):

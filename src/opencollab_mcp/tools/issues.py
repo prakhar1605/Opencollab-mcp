@@ -14,11 +14,13 @@ from ..constants import (
     BLOCKING_ISSUE_LABELS,
     LINKED_PRS_GRAPHQL_LIMIT,
     PR_PLAN_ISSUE_BODY_LIMIT,
+    TIMELINE_MAX_PAGES,
     WARNING_ISSUE_LABELS,
 )
 from ..github_client import (
     GitHubGraphQLError,
     github_get,
+    github_get_all,
     github_graphql,
     handle_github_error,
     has_github_token,
@@ -275,6 +277,7 @@ def register(mcp: MCPServer) -> None:
         mentioned_in_prs: list[dict[str, Any]] = []
         linked_prs_checked = True
         linked_prs_source = "rest"
+        timeline_truncated = False
         default_repo_key = f"{params.owner}/{params.repo}".lower()
 
         if has_github_token():
@@ -287,9 +290,10 @@ def register(mcp: MCPServer) -> None:
                         "number": issue_num,
                     },
                 ),
-                github_get(
+                github_get_all(
                     f"{path}/issues/{issue_num}/timeline",
                     {"per_page": 100},
+                    max_pages=TIMELINE_MAX_PAGES,
                     use_cache=False,
                 ),
                 return_exceptions=True,
@@ -307,22 +311,26 @@ def register(mcp: MCPServer) -> None:
                 # Log clean diagnostic via handle_github_error before falling back.
                 handle_github_error(graphql_res)
 
+            timeline_events: list[Any] | None = None
+            if isinstance(timeline_res, tuple):
+                timeline_events, timeline_truncated = timeline_res
+
             if graphql_prs is not None:
                 linked_prs_source = "graphql"
                 linked_keys = {key for key, _ in graphql_prs}
                 linked_prs = [pr for _, pr in graphql_prs]
-                if isinstance(timeline_res, list):
+                if timeline_events is not None:
                     for key, _, pr in _extract_timeline_prs(
-                        timeline_res,
+                        timeline_events,
                         owner=params.owner,
                         repo=params.repo,
                         issue_num=issue_num,
                     ):
                         if key not in linked_keys:
                             mentioned_in_prs.append(pr)
-            elif isinstance(timeline_res, list):
+            elif timeline_events is not None:
                 for _, closes, pr in _extract_timeline_prs(
-                    timeline_res,
+                    timeline_events,
                     owner=params.owner,
                     repo=params.repo,
                     issue_num=issue_num,
@@ -335,9 +343,10 @@ def register(mcp: MCPServer) -> None:
                 linked_prs_checked = False
         else:
             try:
-                timeline = await github_get(
+                timeline, timeline_truncated = await github_get_all(
                     f"{path}/issues/{issue_num}/timeline",
                     {"per_page": 100},
+                    max_pages=TIMELINE_MAX_PAGES,
                     use_cache=False,
                 )
                 for _, closes, pr in _extract_timeline_prs(
@@ -356,7 +365,7 @@ def register(mcp: MCPServer) -> None:
                 linked_prs_checked = False
 
         if any(pr.get("state") == "open" for pr in linked_prs):
-            return json.dumps({
+            payload = {
                 "available": False,
                 "reason": "An open PR already exists for this issue",
                 "linked_prs": linked_prs,
@@ -364,10 +373,13 @@ def register(mcp: MCPServer) -> None:
                 "linked_prs_checked": linked_prs_checked,
                 "linked_prs_source": linked_prs_source,
                 "issue_title": issue.get("title", ""),
-            }, indent=2)
+            }
+            if timeline_truncated:
+                payload["timeline_truncated"] = True
+            return json.dumps(payload, indent=2)
 
         if any(pr.get("merged") for pr in linked_prs):
-            return json.dumps({
+            payload = {
                 "available": False,
                 "reason": "A linked PR was already merged — the issue may already be fixed",
                 "linked_prs": linked_prs,
@@ -375,7 +387,10 @@ def register(mcp: MCPServer) -> None:
                 "linked_prs_checked": linked_prs_checked,
                 "linked_prs_source": linked_prs_source,
                 "issue_title": issue.get("title", ""),
-            }, indent=2)
+            }
+            if timeline_truncated:
+                payload["timeline_truncated"] = True
+            return json.dumps(payload, indent=2)
 
         labels = [lb.get("name", "") for lb in issue.get("labels", [])]
         blocking = [lb for lb in labels if _normalize_label(lb) in BLOCKING_ISSUE_LABELS]
@@ -394,18 +409,28 @@ def register(mcp: MCPServer) -> None:
                 reason += " (a PR also mentions this issue — take a look before starting)"
             if not linked_prs_checked:
                 reason += " (linked PRs could not be checked either)"
+            elif timeline_truncated:
+                reason += " (timeline was truncated — look for a recent open PR before starting)"
         elif mentioned_in_prs:
             reason = (
                 "No assignees or closing PRs, though a PR mentions this issue — "
                 "take a look before starting"
             )
-        elif linked_prs_checked:
-            reason = "No assignees, no open PRs — go for it!"
-        else:
+            if timeline_truncated:
+                reason += " (timeline was also truncated — check for recent PRs)"
+        elif not linked_prs_checked:
             reason = (
                 "No assignees, but linked PRs could not be checked "
                 "(timeline request failed) — look for an open PR before starting"
             )
+        elif timeline_truncated:
+            reason = (
+                f"No assignees or closing PRs found in the first "
+                f"{TIMELINE_MAX_PAGES * 100} timeline events (timeline truncated) "
+                f"— look for a recent open PR before starting"
+            )
+        else:
+            reason = "No assignees, no open PRs — go for it!"
         payload = {
             "available": True,
             "reason": reason,
@@ -418,6 +443,8 @@ def register(mcp: MCPServer) -> None:
             "linked_prs_source": linked_prs_source,
             "created_days_ago": days_ago(issue.get("created_at")),
         }
+        if timeline_truncated:
+            payload["timeline_truncated"] = True
         if warning_labels:
             payload["warning_labels"] = warning_labels
         return json.dumps(payload, indent=2)
