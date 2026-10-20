@@ -543,3 +543,138 @@ async def test_rate_limit_warns_on_202_response(monkeypatch, caplog):
 
     assert result == {}
     assert len(messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_github_graphql_returns_data(mock_github, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_valid")
+    captured = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["auth"] = request.headers.get("Authorization")
+        return httpx.Response(200, json={"data": {"viewer": {"login": "octocat"}}})
+
+    mock_github({"/graphql": _handler})
+    data = await github_client.github_graphql("query { viewer { login } }", {"x": 1})
+    assert data == {"viewer": {"login": "octocat"}}
+    assert captured == {"method": "POST", "auth": "Bearer ghp_valid"}
+
+
+@pytest.mark.parametrize(
+    ("error_entry", "headers", "expected_substr"),
+    [
+        (
+            {"type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 9."},
+            {},
+            "not found",
+        ),
+        (
+            {"type": "RATE_LIMITED", "message": "API rate limit exceeded"},
+            {"x-ratelimit-reset": str(int(time.time()) + 600)},
+            "rate limit exceeded",
+        ),
+        (
+            {"type": "FORBIDDEN", "message": "Resource not accessible by integration"},
+            {},
+            "denied access",
+        ),
+        (
+            {"type": "INSUFFICIENT_SCOPES", "message": "Missing public_repo scope"},
+            {},
+            "public_repo",
+        ),
+        (
+            {"message": "Requires authentication"},
+            {},
+            "authentication failed",
+        ),
+        (
+            {"message": "Field 'bad' doesn't exist on type 'Issue'"},
+            {},
+            "Field 'bad' doesn't exist on type 'Issue'",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_github_graphql_http_200_errors_map_to_friendly_messages(
+    mock_github, caplog, error_entry, headers, expected_substr
+):
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers=headers, json={"errors": [error_entry]})
+
+    mock_github({"/graphql": _handler})
+    with pytest.raises(github_client.GitHubGraphQLError) as exc:
+        await github_client.github_graphql("query { viewer { login } }")
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        friendly = github_client.handle_github_error(exc.value)
+
+    assert expected_substr.lower() in friendly.lower()
+    # Expected GraphQL errors warn cleanly without noisy Python tracebacks.
+    records = [r for r in caplog.records if r.name == "opencollab_mcp.github"]
+    assert records and all(r.exc_info is None for r in records)
+
+
+@pytest.mark.asyncio
+async def test_graphql_rate_limit_tracked_independently_from_rest(mock_github, caplog):
+    def _graphql_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "graphql", "x-ratelimit-remaining": "3"},
+            json={"data": {"ok": True}},
+        )
+
+    def _rest_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "core", "x-ratelimit-remaining": "4999"},
+            json={"ok": True},
+        )
+
+    mock_github({"/graphql": _graphql_handler, "/users/octocat": _rest_handler})
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        await github_client.github_graphql("query { ok }")
+        # Healthy core REST quota must NOT reset the low GraphQL quota warning state.
+        await github_client.github_get("/users/octocat", use_cache=False)
+        await github_client.github_graphql("query { ok }")
+
+    warnings = [r.getMessage() for r in caplog.records if "quota is running low" in r.getMessage()]
+    assert len(warnings) == 1
+    assert "graphql" in warnings[0].lower()
+
+
+@pytest.mark.asyncio
+async def test_github_graphql_retries_once_on_transient_503(mock_github, monkeypatch):
+    calls = {"n": 0}
+    monkeypatch.setattr(github_client, "GITHUB_RETRY_DELAY_SECONDS", 0)
+
+    def _flaky_graphql(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(503, text="Service Unavailable")
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "graphql", "x-ratelimit-remaining": "4999"},
+            json={"data": {"ok": True}},
+        )
+
+    mock_github({"/graphql": _flaky_graphql})
+    data = await github_client.github_graphql("query { ok }")
+    assert data == {"ok": True}
+    assert calls["n"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_response",
+    [
+        httpx.Response(200, text="<html>bad gateway proxy</html>"),
+        httpx.Response(200, json=["unexpected", "list"]),
+    ],
+)
+async def test_github_graphql_rejects_malformed_json_payloads(mock_github, bad_response):
+    mock_github({"/graphql": lambda _req: bad_response})
+    with pytest.raises(github_client.GitHubGraphQLError):
+        await github_client.github_graphql("query { ok }")
+

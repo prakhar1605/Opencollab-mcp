@@ -4,18 +4,178 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
+import httpx
 from mcp.server.mcpserver import MCPServer
 
 from ..constants import (
     ASSIGNED_ISSUE_STALE_DAYS,
     BLOCKING_ISSUE_LABELS,
+    LINKED_PRS_GRAPHQL_LIMIT,
     PR_PLAN_ISSUE_BODY_LIMIT,
     WARNING_ISSUE_LABELS,
 )
-from ..github_client import github_get, handle_github_error
-from ..helpers import days_ago, decode_base64_content, parse_issue_number, truncate
+from ..github_client import (
+    GitHubGraphQLError,
+    github_get,
+    github_graphql,
+    handle_github_error,
+    has_github_token,
+)
+from ..helpers import (
+    days_ago,
+    decode_base64_content,
+    extract_issue_repo,
+    parse_issue_number,
+    pr_closes_issue,
+    truncate,
+)
 from ..models import IssueInput
+
+_CLOSING_PRS_QUERY = f"""
+query($owner: String!, $repo: String!, $number: Int!) {{
+  repository(owner: $owner, name: $repo) {{
+    issue(number: $number) {{
+      closedByPullRequestsReferences(first: {LINKED_PRS_GRAPHQL_LIMIT}, includeClosedPrs: true) {{
+        nodes {{
+          number
+          title
+          state
+          merged
+          url
+          author {{ login }}
+          repository {{ nameWithOwner }}
+        }}
+      }}
+    }}
+  }}
+}}
+"""
+
+
+def _extract_graphql_closing_prs(
+    data: dict[str, Any], default_repo_key: str
+) -> list[tuple[tuple[str, int | None], dict[str, Any]]]:
+    """Parse `closedByPullRequestsReferences.nodes` into normalized PR dicts.
+
+    Raises `ValueError` if the GraphQL payload lacks the expected repository or
+    issue structure so callers cleanly fall back to REST.
+    """
+    repo_obj = data.get("repository")
+    if not isinstance(repo_obj, dict):
+        raise ValueError("Missing repository in GraphQL response")
+    issue_obj = repo_obj.get("issue")
+    if not isinstance(issue_obj, dict):
+        raise ValueError("Missing issue in GraphQL response")
+    refs = issue_obj.get("closedByPullRequestsReferences")
+    if not isinstance(refs, dict) or not isinstance(refs.get("nodes"), list):
+        raise ValueError("Missing closedByPullRequestsReferences nodes")
+
+    results: list[tuple[tuple[str, int | None], dict[str, Any]]] = []
+    seen: set[tuple[str, int | None]] = set()
+    for node in refs["nodes"]:
+        if not isinstance(node, dict):
+            continue
+        pr_number = node.get("number")
+        repo_info = node.get("repository")
+        repo_name = (
+            repo_info.get("nameWithOwner", "")
+            if isinstance(repo_info, dict)
+            else ""
+        )
+        repo_key = (repo_name or default_repo_key).lower()
+        dedup_key = (repo_key, pr_number)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+
+        raw_state = str(node.get("state") or "unknown").lower()
+        merged = bool(node.get("merged")) or raw_state == "merged"
+        state = (
+            "open"
+            if raw_state == "open"
+            else ("closed" if raw_state in ("closed", "merged") else raw_state)
+        )
+        author_obj = node.get("author")
+        author = (
+            author_obj.get("login") or "unknown"
+            if isinstance(author_obj, dict)
+            else "unknown"
+        )
+        results.append(
+            (
+                dedup_key,
+                {
+                    "pr_number": pr_number,
+                    "title": node.get("title", ""),
+                    "state": state,
+                    "author": author,
+                    "merged": merged,
+                },
+            )
+        )
+    return results
+
+
+def _extract_timeline_prs(
+    timeline: list[Any], *, owner: str, repo: str, issue_num: int
+) -> list[tuple[tuple[str, int | None], bool, dict[str, Any]]]:
+    """Extract `(dedup_key, closes_issue, pr_dict)` entries from REST timeline events.
+
+    GitHub's REST timeline schema (`#/components/schemas/timeline-cross-referenced-event`)
+    embeds the full `#/components/schemas/issue` object at `source.issue`, which
+    already includes `title`, `body`, `repository_url`, `html_url`, `user`, and
+    `pull_request` — so no extra per-PR HTTP request is needed.
+    """
+    default_repo_key = f"{owner}/{repo}".lower()
+    entries: dict[tuple[str, int | None], tuple[bool, dict[str, Any]]] = {}
+
+    for event in timeline:
+        if not isinstance(event, dict) or event.get("event") != "cross-referenced":
+            continue
+        source = event.get("source")
+        issue_obj = source.get("issue") if isinstance(source, dict) else None
+        if not isinstance(issue_obj, dict):
+            continue
+        pr_info = issue_obj.get("pull_request")
+        if pr_info is None:
+            continue
+
+        pr_repo = extract_issue_repo(issue_obj)
+        repo_key = (
+            f"{pr_repo[0]}/{pr_repo[1]}".lower() if pr_repo else default_repo_key
+        )
+        pr_number = issue_obj.get("number")
+        dedup_key = (repo_key, pr_number)
+
+        merged = bool(pr_info.get("merged_at")) if isinstance(pr_info, dict) else False
+        closes = pr_closes_issue(
+            issue_obj.get("title"),
+            issue_obj.get("body"),
+            owner=owner,
+            repo=repo,
+            issue_number=issue_num,
+            pr_repo=pr_repo,
+        )
+        pr_entry = {
+            "pr_number": pr_number,
+            "title": issue_obj.get("title", ""),
+            "state": issue_obj.get("state", "unknown"),
+            "author": (
+                issue_obj.get("user", {}).get("login", "unknown")
+                if isinstance(issue_obj.get("user"), dict)
+                else "unknown"
+            ),
+            "merged": merged,
+        }
+        if dedup_key in entries:
+            prev_closes, _ = entries[dedup_key]
+            entries[dedup_key] = (prev_closes or closes, pr_entry)
+        else:
+            entries[dedup_key] = (closes, pr_entry)
+
+    return [(key, closes, pr_entry) for key, (closes, pr_entry) in entries.items()]
 
 
 def _bad_issue_number(raw: str, err: Exception) -> str:
@@ -111,43 +271,98 @@ def register(mcp: MCPServer) -> None:
                 payload["active_lock_reason"] = issue["active_lock_reason"]
             return json.dumps(payload, indent=2)
 
-        linked_prs: list[dict] = []
+        linked_prs: list[dict[str, Any]] = []
+        mentioned_in_prs: list[dict[str, Any]] = []
         linked_prs_checked = True
-        try:
-            timeline = await github_get(
-                f"{path}/issues/{issue_num}/timeline",
-                {"per_page": 100},
-                use_cache=False,
+        linked_prs_source = "rest"
+        default_repo_key = f"{params.owner}/{params.repo}".lower()
+
+        if has_github_token():
+            graphql_res, timeline_res = await asyncio.gather(
+                github_graphql(
+                    _CLOSING_PRS_QUERY,
+                    {
+                        "owner": params.owner,
+                        "repo": params.repo,
+                        "number": issue_num,
+                    },
+                ),
+                github_get(
+                    f"{path}/issues/{issue_num}/timeline",
+                    {"per_page": 100},
+                    use_cache=False,
+                ),
+                return_exceptions=True,
             )
-            for event in timeline:
-                if event.get("event") == "cross-referenced":
-                    source = event.get("source", {})
-                    issue_obj = source.get("issue", {}) if isinstance(source, dict) else {}
-                    pr_info = issue_obj.get("pull_request") if isinstance(issue_obj, dict) else None
-                    if pr_info is not None:
-                        merged = bool(pr_info.get("merged_at")) if isinstance(pr_info, dict) else False
-                        linked_prs.append({
-                            "pr_number": issue_obj.get("number"),
-                            "title": issue_obj.get("title", ""),
-                            "state": issue_obj.get("state", "unknown"),
-                            "author": (
-                                issue_obj.get("user", {}).get("login", "unknown")
-                                if isinstance(issue_obj.get("user"), dict)
-                                else "unknown"
-                            ),
-                            "merged": merged,
-                        })
-        except Exception:
-            # Without the timeline we can't tell whether a PR is already open,
-            # so say so instead of reporting "no open PRs".
-            linked_prs_checked = False
+
+            graphql_prs: list[tuple[tuple[str, int | None], dict[str, Any]]] | None = None
+            if not isinstance(graphql_res, BaseException):
+                try:
+                    graphql_prs = _extract_graphql_closing_prs(
+                        graphql_res, default_repo_key
+                    )
+                except ValueError:
+                    graphql_prs = None
+            elif isinstance(graphql_res, GitHubGraphQLError | httpx.HTTPError):
+                # Log clean diagnostic via handle_github_error before falling back.
+                handle_github_error(graphql_res)
+
+            if graphql_prs is not None:
+                linked_prs_source = "graphql"
+                linked_keys = {key for key, _ in graphql_prs}
+                linked_prs = [pr for _, pr in graphql_prs]
+                if isinstance(timeline_res, list):
+                    for key, _, pr in _extract_timeline_prs(
+                        timeline_res,
+                        owner=params.owner,
+                        repo=params.repo,
+                        issue_num=issue_num,
+                    ):
+                        if key not in linked_keys:
+                            mentioned_in_prs.append(pr)
+            elif isinstance(timeline_res, list):
+                for _, closes, pr in _extract_timeline_prs(
+                    timeline_res,
+                    owner=params.owner,
+                    repo=params.repo,
+                    issue_num=issue_num,
+                ):
+                    if closes:
+                        linked_prs.append(pr)
+                    else:
+                        mentioned_in_prs.append(pr)
+            else:
+                linked_prs_checked = False
+        else:
+            try:
+                timeline = await github_get(
+                    f"{path}/issues/{issue_num}/timeline",
+                    {"per_page": 100},
+                    use_cache=False,
+                )
+                for _, closes, pr in _extract_timeline_prs(
+                    timeline,
+                    owner=params.owner,
+                    repo=params.repo,
+                    issue_num=issue_num,
+                ):
+                    if closes:
+                        linked_prs.append(pr)
+                    else:
+                        mentioned_in_prs.append(pr)
+            except Exception:
+                # Without the timeline we can't tell whether a PR is already open,
+                # so say so instead of reporting "no open PRs".
+                linked_prs_checked = False
 
         if any(pr.get("state") == "open" for pr in linked_prs):
             return json.dumps({
                 "available": False,
                 "reason": "An open PR already exists for this issue",
                 "linked_prs": linked_prs,
+                "mentioned_in_prs": mentioned_in_prs,
                 "linked_prs_checked": linked_prs_checked,
+                "linked_prs_source": linked_prs_source,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
@@ -156,7 +371,9 @@ def register(mcp: MCPServer) -> None:
                 "available": False,
                 "reason": "A linked PR was already merged — the issue may already be fixed",
                 "linked_prs": linked_prs,
+                "mentioned_in_prs": mentioned_in_prs,
                 "linked_prs_checked": linked_prs_checked,
+                "linked_prs_source": linked_prs_source,
                 "issue_title": issue.get("title", ""),
             }, indent=2)
 
@@ -173,8 +390,15 @@ def register(mcp: MCPServer) -> None:
 
         if warning_labels:
             reason = f"Labelled {warning_labels[0]!r} — ask a maintainer before starting"
+            if mentioned_in_prs:
+                reason += " (a PR also mentions this issue — take a look before starting)"
             if not linked_prs_checked:
                 reason += " (linked PRs could not be checked either)"
+        elif mentioned_in_prs:
+            reason = (
+                "No assignees or closing PRs, though a PR mentions this issue — "
+                "take a look before starting"
+            )
         elif linked_prs_checked:
             reason = "No assignees, no open PRs — go for it!"
         else:
@@ -189,7 +413,9 @@ def register(mcp: MCPServer) -> None:
             "labels": labels,
             "comments": issue.get("comments", 0),
             "linked_prs": linked_prs,
+            "mentioned_in_prs": mentioned_in_prs,
             "linked_prs_checked": linked_prs_checked,
+            "linked_prs_source": linked_prs_source,
             "created_days_ago": days_ago(issue.get("created_at")),
         }
         if warning_labels:

@@ -25,6 +25,7 @@ Changes merged since v0.6.1.
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- `opencollab_check_issue_availability` now distinguishes closing PRs from plain issue mentions: uses GraphQL `closedByPullRequestsReferences` when authenticated, falls back to closing-keyword parsing on REST timeline events when unauthenticated or when GraphQL fails, reports non-closing mentions separately in `mentioned_in_prs` without blocking availability, and exposes `linked_prs_source` ([#204](https://github.com/prakhar1605/Opencollab-mcp/issues/204))
 - Docker health check now uses the configured `PORT` instead of always 8000 ([#73](https://github.com/prakhar1605/Opencollab-mcp/pull/73))
 - `check_issue_availability` now reports timeline failures and reads 100 events ([#43](https://github.com/prakhar1605/Opencollab-mcp/pull/43))
 - Issues are marked unavailable when a linked PR was already merged ([#40](https://github.com/prakhar1605/Opencollab-mcp/pull/40))

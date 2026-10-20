@@ -170,3 +170,171 @@ class TestParseGitHubURL:
 
         with pytest.raises(ValueError):
             helpers.parse_github_url(url)
+
+
+class TestPrClosesIssue:
+    @pytest.mark.parametrize(
+        "keyword",
+        [
+            "close",
+            "closes",
+            "closed",
+            "fix",
+            "fixes",
+            "fixed",
+            "resolve",
+            "resolves",
+            "resolved",
+            "FIXES",
+            "Closes",
+            "ReSoLvEd",
+        ],
+    )
+    def test_all_closing_keywords_and_casings(self, keyword):
+        from opencollab_mcp.helpers import pr_closes_issue
+
+        assert pr_closes_issue(
+            None,
+            f"Summary\n\n{keyword} #123",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+        )
+
+    @pytest.mark.parametrize(
+        ("title", "body"),
+        [
+            ("fix: handle timeout (fixes #123)", None),
+            ("Unrelated title", "Fixes: #123"),
+            ("Unrelated title", "Closes:#123."),
+            ("Unrelated title", "closes owner/repo#123"),
+            ("Unrelated title", "CLOSES Owner/Repo#123"),
+            ("Unrelated title", "resolves https://github.com/owner/repo/issues/123"),
+            ("Unrelated title", "resolves http://www.github.com/OWNER/REPO/issues/123/"),
+            ("Unrelated title", "Fixes https://github.com/owner/repo/issues/123#issue-1"),
+        ],
+    )
+    def test_matches_title_colon_repo_shorthand_and_full_urls(self, title, body):
+        from opencollab_mcp.helpers import pr_closes_issue
+
+        assert pr_closes_issue(
+            title,
+            body,
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+        )
+
+    @pytest.mark.parametrize(
+        ("text", "issue_number"),
+        [
+            # Numeric prefix / suffix traps (#12 vs #123)
+            ("Fixes #12", 123),
+            ("Fixes #123", 12),
+            ("Fixes owner/repo#12", 123),
+            ("Fixes owner/repo#123", 12),
+            ("Resolves https://github.com/owner/repo/issues/12", 123),
+            ("Resolves https://github.com/owner/repo/issues/123", 12),
+            # Plain mentions without closing keywords
+            ("Related to #123", 123),
+            ("See also owner/repo#123", 123),
+            ("Unlike #123, this keeps the old path", 123),
+            ("Part of https://github.com/owner/repo/issues/123", 123),
+            ("Refs #123", 123),
+            # Different repository or non-issue URL
+            ("Fixes other/repo#123", 123),
+            ("Fixes owner/other#123", 123),
+            ("Resolves https://github.com/other/repo/issues/123", 123),
+            ("Resolves https://github.com/owner/repo/pull/123", 123),
+            ("Resolves https://github.com/owner/repo/issues/123/extra", 123),
+            # Substring keyword / code / HTML comment traps
+            ("prefixfix #123", 123),
+            ("Fixes `#123`", 123),
+            ("<!-- Closes #123 -->", 123),
+            ("```\nFixes #123\n```", 123),
+            ("", 123),
+        ],
+    )
+    def test_does_not_match_false_positives(self, text, issue_number):
+        from opencollab_mcp.helpers import pr_closes_issue
+
+        assert not pr_closes_issue(
+            None,
+            text,
+            owner="owner",
+            repo="repo",
+            issue_number=issue_number,
+        )
+
+    def test_cross_repo_bare_hash_targets_other_repo_not_this_issue(self):
+        from opencollab_mcp.helpers import pr_closes_issue
+
+        # A PR in fork/other writing "See owner/repo#123. Fixes #123" closes
+        # fork/other#123, not owner/repo#123.
+        assert not pr_closes_issue(
+            None,
+            "See owner/repo#123. Fixes #123",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+            pr_repo=("fork", "other"),
+        )
+        # Explicit owner/repo#123 or URL from another repo DOES close owner/repo#123.
+        assert pr_closes_issue(
+            None,
+            "Fixes owner/repo#123",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+            pr_repo=("fork", "other"),
+        )
+        assert pr_closes_issue(
+            None,
+            "Resolves https://github.com/owner/repo/issues/123",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+            pr_repo=("fork", "other"),
+        )
+
+    def test_multi_issue_closing_list_and_inline_code_exclusion(self):
+        from opencollab_mcp.helpers import pr_closes_issue
+
+        assert pr_closes_issue(
+            None,
+            "Resolves #10, fixes #123, resolves other/repo#9",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+        )
+        assert not pr_closes_issue(
+            None,
+            "Intentionally omitted `Closes #123` because this only preps for #123.",
+            owner="owner",
+            repo="repo",
+            issue_number=123,
+        )
+
+
+class TestExtractIssueRepo:
+    @pytest.mark.parametrize(
+        ("issue_obj", "expected"),
+        [
+            ({"repository": {"full_name": "octo/repo"}}, ("octo", "repo")),
+            (
+                {"repository_url": "https://api.github.com/repos/octo/repo"},
+                ("octo", "repo"),
+            ),
+            (
+                {"html_url": "https://github.com/octo/repo/pull/42"},
+                ("octo", "repo"),
+            ),
+            ({"html_url": "https://example.com/not-github"}, None),
+            ({}, None),
+        ],
+    )
+    def test_extracts_owner_and_repo_across_payload_shapes(self, issue_obj, expected):
+        from opencollab_mcp.helpers import extract_issue_repo
+
+        assert extract_issue_repo(issue_obj) == expected
+

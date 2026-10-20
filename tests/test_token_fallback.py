@@ -2,7 +2,7 @@
 
 import pytest
 
-from opencollab_mcp.github_client import _get_headers
+from opencollab_mcp.github_client import _get_headers, has_github_token
 
 
 @pytest.mark.parametrize("github_token, gh_token, expected", [
@@ -22,5 +22,7 @@ def test_token_precedence(monkeypatch, github_token, gh_token, expected):
     headers = _get_headers()
     if expected is None:
         assert "Authorization" not in headers
+        assert has_github_token() is False
     else:
         assert headers["Authorization"] == f"Bearer {expected}"
+        assert has_github_token() is True
