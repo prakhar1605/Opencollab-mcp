@@ -59,6 +59,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- `opencollab_check_issue_availability` now distinguishes closing PRs from plain issue mentions: uses GraphQL `closedByPullRequestsReferences` when authenticated, falls back to closing-keyword parsing on REST timeline events when unauthenticated or when GraphQL fails, reports non-closing mentions separately in `mentioned_in_prs` without blocking availability, and exposes `linked_prs_source` ([#204](https://github.com/prakhar1605/Opencollab-mcp/issues/204))
 - Date-dependent tests are now relative to the current time, so they no longer fail as the calendar moves on ([#196](https://github.com/prakhar1605/Opencollab-mcp/pull/196))
 - Transient GitHub server failures are retried once ([#158](https://github.com/prakhar1605/Opencollab-mcp/pull/158))
 - `check_issue_availability` explains why a closed issue is unavailable ([#160](https://github.com/prakhar1605/Opencollab-mcp/pull/160))

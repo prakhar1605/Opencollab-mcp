@@ -46,6 +46,7 @@ WARNING_ISSUE_LABELS = frozenset({
 
 # ---- PR planning previews ----
 PR_PLAN_ISSUE_BODY_LIMIT = 1500
+LINKED_PRS_GRAPHQL_LIMIT = 20
 
 # ---- Search windows (days) ----
 RECENT_ISSUES_DAYS = 90

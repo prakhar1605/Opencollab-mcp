@@ -31,6 +31,7 @@ from .constants import (
 logger = logging.getLogger("opencollab_mcp.github")
 
 _rate_limit_warned = False
+_graphql_rate_limit_warned = False
 
 # ---- in-memory TTL cache --------------------------------------------------
 
@@ -93,8 +94,23 @@ def reset_client() -> None:
     is not awaited closed — it holds only idle pooled connections, and this is
     not a production code path.
     """
-    global _client
+    global _client, _rate_limit_warned, _graphql_rate_limit_warned
     _client = None
+    _rate_limit_warned = False
+    _graphql_rate_limit_warned = False
+
+
+def _get_token() -> str:
+    """Return stripped auth token (`GITHUB_TOKEN` preferred over `GH_TOKEN`)."""
+    return (
+        os.environ.get("GITHUB_TOKEN", "").strip()
+        or os.environ.get("GH_TOKEN", "").strip()
+    )
+
+
+def has_github_token() -> bool:
+    """Return True when a non-empty GitHub token is configured."""
+    return bool(_get_token())
 
 
 def _get_headers() -> dict[str, str]:
@@ -102,7 +118,7 @@ def _get_headers() -> dict[str, str]:
     # Strip whitespace: a token from a file or `$(cat token.txt)` often
     # carries a trailing newline, which httpx rejects as an illegal header
     # value with an error that doesn't mention the token at all.
-    token = os.environ.get("GITHUB_TOKEN", "").strip() or os.environ.get("GH_TOKEN", "").strip()
+    token = _get_token()
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
@@ -160,6 +176,68 @@ async def github_get(
     return data
 
 
+class GitHubGraphQLError(Exception):
+    """Raised when GitHub's GraphQL endpoint returns HTTP 200 with `errors`."""
+
+    def __init__(self, errors: list[Any], response: httpx.Response) -> None:
+        self.errors = errors
+        self.response = response
+        first = errors[0] if errors and isinstance(errors[0], dict) else {}
+        self.error_type: str = str(first.get("type") or "").upper()
+        message = first.get("message")
+        self.detail: str = (
+            message if isinstance(message, str) and message else "GraphQL query failed"
+        )
+        super().__init__(self.detail)
+
+
+async def github_graphql(
+    query: str,
+    variables: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute a POST request against GitHub's GraphQL API.
+
+    GraphQL often returns HTTP 200 with an `errors` list on failure (missing
+    resource, missing scopes, or exhausted GraphQL rate limit). Those responses
+    raise `GitHubGraphQLError` so callers can either fall back to REST or map
+    them through `handle_github_error`.
+    """
+    body: dict[str, Any] = {"query": query, "variables": variables or {}}
+    for attempt in range(2):
+        resp = await _get_client().post(
+            f"{GITHUB_API_BASE}/graphql",
+            headers=_get_headers(),
+            json=body,
+        )
+        if resp.status_code not in (502, 503, 504) or attempt == 1:
+            break
+        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+
+    resp.raise_for_status()
+    _check_rate_limit(resp)
+
+    try:
+        payload = resp.json()
+    except ValueError as err:
+        raise GitHubGraphQLError(
+            [{"message": "Invalid JSON response from GitHub GraphQL API"}],
+            resp,
+        ) from err
+
+    if not isinstance(payload, dict):
+        raise GitHubGraphQLError(
+            [{"message": "Unexpected response format from GitHub GraphQL API"}],
+            resp,
+        )
+
+    errors = payload.get("errors")
+    if isinstance(errors, list) and errors:
+        raise GitHubGraphQLError(errors, resp)
+
+    data = payload.get("data")
+    return data if isinstance(data, dict) else {}
+
+
 async def github_search(
     endpoint: str,
     query: str,
@@ -191,8 +269,12 @@ def _reset_hint(response: httpx.Response) -> str:
 
 
 def _check_rate_limit(response: httpx.Response) -> None:
-    """Log a warning when GitHub API quota is running low."""
-    global _rate_limit_warned
+    """Log a warning when GitHub API quota is running low.
+
+    REST (`core`) and GraphQL (`x-ratelimit-resource: graphql`) maintain
+    separate hourly buckets, so their warning flags are tracked independently.
+    """
+    global _rate_limit_warned, _graphql_rate_limit_warned
     header_value = response.headers.get("x-ratelimit-remaining")
     if header_value is None:
         return
@@ -200,17 +282,27 @@ def _check_rate_limit(response: httpx.Response) -> None:
         remaining = int(header_value)
     except (ValueError, TypeError):
         return
+    is_graphql = response.headers.get("x-ratelimit-resource", "").lower() == "graphql"
     if remaining >= GITHUB_RATE_LIMIT_WARNING_THRESHOLD:
-        _rate_limit_warned = False
+        if is_graphql:
+            _graphql_rate_limit_warned = False
+        else:
+            _rate_limit_warned = False
         return
-    if not _rate_limit_warned:
+    warned = _graphql_rate_limit_warned if is_graphql else _rate_limit_warned
+    if not warned:
+        quota_label = "GitHub GraphQL API quota" if is_graphql else "GitHub API quota"
         logger.warning(
-            "GitHub API quota is running low (%s requests remaining).%s"
+            "%s is running low (%s requests remaining).%s"
             "Set GITHUB_TOKEN for a 5,000 requests/hour limit.",
+            quota_label,
             remaining,
-            _reset_hint(response)
+            _reset_hint(response),
         )
-        _rate_limit_warned = True
+        if is_graphql:
+            _graphql_rate_limit_warned = True
+        else:
+            _rate_limit_warned = True
 
 
 def _validation_message(response: httpx.Response) -> str:
@@ -235,9 +327,46 @@ def _validation_message(response: httpx.Response) -> str:
 def handle_github_error(e: Exception) -> str:
     """Return a human-friendly error string for GitHub API failures.
 
-    Expected HTTP client errors log warnings without tracebacks. Other
+    Expected HTTP/GraphQL client errors log warnings without tracebacks. Other
     failures retain their traceback for diagnosis while users see guidance.
     """
+    if isinstance(e, GitHubGraphQLError):
+        logger.warning(
+            "GitHub GraphQL error (%s): %s",
+            e.error_type or "untyped",
+            e.detail,
+        )
+        detail_lower = e.detail.lower()
+        remaining = e.response.headers.get("x-ratelimit-remaining", "")
+        if (
+            e.error_type == "RATE_LIMITED"
+            or remaining == "0"
+            or "rate limit" in detail_lower
+        ):
+            return (
+                f"Error: GitHub API rate limit exceeded."
+                f"{_reset_hint(e.response)} Set GITHUB_TOKEN for a "
+                f"5,000 requests/hour limit."
+            )
+        if (
+            e.error_type in ("UNAUTHORIZED", "UNAUTHENTICATED")
+            or "requires authentication" in detail_lower
+            or "bad credentials" in detail_lower
+        ):
+            return (
+                "Error: GitHub authentication failed. "
+                "Check your GITHUB_TOKEN environment variable."
+            )
+        if e.error_type in ("FORBIDDEN", "INSUFFICIENT_SCOPES"):
+            return (
+                "Error: GitHub denied access (403). Your token may be "
+                "missing the 'public_repo' scope, or the resource is "
+                "private."
+            )
+        if e.error_type == "NOT_FOUND":
+            return "Error: Resource not found on GitHub. Double-check the username or repo name."
+        return f"Error: GitHub rejected the request — {e.detail}"
+
     if isinstance(e, httpx.HTTPStatusError) and 400 <= e.response.status_code < 500:
         logger.warning("GitHub API %s for %s", e.response.status_code, e.request.url)
     else:

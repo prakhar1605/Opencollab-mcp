@@ -83,6 +83,7 @@ async def test_merged_pull_request_marks_issue_unavailable(mock_github):
                         "number": 9,
                         "state": "closed",
                         "title": "Fix bug",
+                        "body": "Closes #7",
                         "pull_request": {"merged_at": "2026-01-01T00:00:00Z"},
                         "user": {"login": "dev1"},
                     }
@@ -95,6 +96,7 @@ async def test_merged_pull_request_marks_issue_unavailable(mock_github):
 
     assert payload["available"] is False
     assert "already merged" in payload["reason"]
+    assert payload["linked_prs_source"] == "rest"
     assert len(payload["linked_prs"]) == 1
     assert payload["linked_prs"][0]["merged"] is True
     assert payload["linked_prs"][0]["pr_number"] == 9
@@ -112,6 +114,7 @@ async def test_closed_unmerged_pull_request_leaves_issue_available(mock_github):
                         "number": 10,
                         "state": "closed",
                         "title": "Abandoned fix",
+                        "body": "Fixes #7",
                         "pull_request": {"merged_at": None},
                         "user": {"login": "dev2"},
                     }
@@ -123,6 +126,7 @@ async def test_closed_unmerged_pull_request_leaves_issue_available(mock_github):
     payload = await _check()
 
     assert payload["available"] is True
+    assert payload["linked_prs_source"] == "rest"
     assert len(payload["linked_prs"]) == 1
     assert payload["linked_prs"][0]["merged"] is False
     assert payload["linked_prs"][0]["pr_number"] == 10
@@ -140,6 +144,7 @@ async def test_open_pull_request_marks_issue_unavailable_and_records_merged_fals
                         "number": 11,
                         "state": "open",
                         "title": "WIP PR",
+                        "body": "Resolves #7",
                         "pull_request": {},
                         "user": {"login": "dev3"},
                     }
@@ -152,9 +157,285 @@ async def test_open_pull_request_marks_issue_unavailable_and_records_merged_fals
 
     assert payload["available"] is False
     assert "open PR" in payload["reason"]
+    assert payload["linked_prs_source"] == "rest"
     assert len(payload["linked_prs"]) == 1
     assert payload["linked_prs"][0]["merged"] is False
     assert payload["linked_prs"][0]["pr_number"] == 11
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("pr_state", "merged_at"),
+    [("open", None), ("closed", "2026-01-01T00:00:00Z")],
+)
+async def test_plain_mention_pr_keeps_issue_available_in_rest_path(
+    mock_github, pr_state, merged_at
+):
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 15,
+                        "state": pr_state,
+                        "title": "Refactor helper",
+                        "body": "Related to #7 — prepares groundwork only.",
+                        "pull_request": {"merged_at": merged_at},
+                        "user": {"login": "helper-dev"},
+                    }
+                },
+            }
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["linked_prs"] == []
+    assert payload["linked_prs_source"] == "rest"
+    assert len(payload["mentioned_in_prs"]) == 1
+    assert payload["mentioned_in_prs"][0]["pr_number"] == 15
+    assert "mentions this issue" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_graphql_sidebar_linked_pr_marks_unavailable_without_cross_reference(
+    mock_github, monkeypatch
+):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [],  # No text mention in PR body -> empty cross-refs
+        "/graphql": {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "closedByPullRequestsReferences": {
+                            "nodes": [
+                                None,  # Inaccessible private PR node from GitHub GraphQL
+                                {
+                                    "number": 42,
+                                    "title": "Fix bug without body keyword",
+                                    "state": "OPEN",
+                                    "merged": False,
+                                    "url": "https://github.com/o/r/pull/42",
+                                    "author": {"login": "sidebar-dev"},
+                                    "repository": {"nameWithOwner": "o/r"},
+                                },
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert payload["linked_prs_source"] == "graphql"
+    assert payload["linked_prs_checked"] is True
+    assert len(payload["linked_prs"]) == 1
+    assert payload["linked_prs"][0] == {
+        "pr_number": 42,
+        "title": "Fix bug without body keyword",
+        "state": "open",
+        "author": "sidebar-dev",
+        "merged": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_graphql_path_separates_mentions_from_closing_prs(mock_github, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 50,
+                        "state": "open",
+                        "title": "Docs note",
+                        "body": "See also #7",
+                        "pull_request": {},
+                        "user": {"login": "doc-dev"},
+                    }
+                },
+            }
+        ],
+        "/graphql": {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "closedByPullRequestsReferences": {"nodes": []}
+                    }
+                }
+            }
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["linked_prs_source"] == "graphql"
+    assert payload["linked_prs"] == []
+    assert len(payload["mentioned_in_prs"]) == 1
+    assert payload["mentioned_in_prs"][0]["pr_number"] == 50
+    assert "mentions this issue" in payload["reason"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "graphql_spec",
+    [
+        (401, {"message": "Bad credentials"}),
+        (403, {"message": "API rate limit exceeded"}),
+        {"errors": [{"type": "NOT_FOUND", "message": "Could not resolve to an Issue"}]},
+        {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]},
+    ],
+)
+async def test_graphql_errors_fall_back_cleanly_to_rest_timeline(
+    mock_github, monkeypatch, graphql_spec
+):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_limited_or_bad")
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/graphql": graphql_spec,
+        "/repos/o/r/issues/7/timeline": [
+            {
+                "event": "cross-referenced",
+                "source": {
+                    "issue": {
+                        "number": 88,
+                        "state": "open",
+                        "title": "Fix bug",
+                        "body": "Fixes #7",
+                        "pull_request": {},
+                        "user": {"login": "fallback-dev"},
+                    }
+                },
+            }
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert payload["linked_prs_source"] == "rest"
+    assert payload["linked_prs_checked"] is True
+    assert payload["linked_prs"][0]["pr_number"] == 88
+
+
+@pytest.mark.asyncio
+async def test_graphql_merged_pr_and_ghost_author_handled(mock_github, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    node = {
+        "number": 61,
+        "title": "Fix race condition",
+        "state": "MERGED",
+        "merged": True,
+        "url": "https://github.com/o/r/pull/61",
+        "author": None,  # Deleted / ghost GitHub account
+        "repository": {"nameWithOwner": "o/r"},
+    }
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/repos/o/r/issues/7/timeline": [],
+        "/graphql": {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "closedByPullRequestsReferences": {
+                            "nodes": [node, node]  # Duplicate refs deduplicated
+                        }
+                    }
+                }
+            }
+        },
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is False
+    assert "already merged" in payload["reason"]
+    assert payload["linked_prs_source"] == "graphql"
+    assert payload["linked_prs"] == [
+        {
+            "pr_number": 61,
+            "title": "Fix race condition",
+            "state": "closed",
+            "author": "unknown",
+            "merged": True,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "malformed_data",
+    [
+        {"data": {}},
+        {"data": {"repository": {"issue": None}}},
+        {"data": {"repository": {"issue": {"closedByPullRequestsReferences": None}}}},
+    ],
+)
+async def test_malformed_graphql_data_falls_back_to_rest_and_reports_total_outage(
+    mock_github, monkeypatch, malformed_data
+):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+    mock_github({
+        "/repos/o/r/issues/7": {"state": "open", "title": "Bug", "assignees": []},
+        "/graphql": malformed_data,
+        "/repos/o/r/issues/7/timeline": (500, {}),
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["linked_prs_source"] == "rest"
+    assert payload["linked_prs_checked"] is False
+    assert "could not be checked" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_rest_timeline_deduplicates_events_and_handles_cross_repo_mentions(mock_github):
+    pr_event = {
+        "event": "cross-referenced",
+        "source": {
+            "issue": {
+                "number": 7,
+                "state": "open",
+                "title": "Downstream fix",
+                "body": "See upstream o/r#7. Closes #7",
+                "repository_url": "https://api.github.com/repos/downstream/app",
+                "pull_request": {},
+                "user": {"login": "downstream-dev"},
+            }
+        },
+    }
+    mock_github({
+        "/repos/o/r/issues/7": _labelled_issue("needs-triage"),
+        # Same PR cross-referenced twice + non-PR cross-reference event
+        "/repos/o/r/issues/7/timeline": [
+            {"event": "labeled"},
+            {"event": "cross-referenced", "source": {"issue": {"number": 3, "state": "open"}}},
+            pr_event,
+            pr_event,
+        ],
+    })
+
+    payload = await _check()
+
+    assert payload["available"] is True
+    assert payload["linked_prs"] == []
+    assert len(payload["mentioned_in_prs"]) == 1
+    assert payload["mentioned_in_prs"][0]["pr_number"] == 7
+    assert "ask a maintainer" in payload["reason"]
+    assert "mentions this issue" in payload["reason"]
 
 
 
