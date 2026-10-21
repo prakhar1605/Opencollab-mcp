@@ -29,6 +29,8 @@ def register(mcp: MCPServer) -> None:
         searches use the "help wanted" label. Returns up to `limit` (default 15,
         max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
+        Each issue includes updated_days_ago (days since its last activity),
+        or null when its update timestamp is missing or unparseable.
         """
         since = recent_date_str(params.max_age_days)
         label = difficulty_label(params.difficulty)
@@ -68,6 +70,7 @@ def register(mcp: MCPServer) -> None:
                 "labels": [lb.get("name", "") for lb in item.get("labels", [])],
                 "comments": item.get("comments", 0),
                 "created_days_ago": days_ago(item.get("created_at")),
+                "updated_days_ago": days_ago(item.get("updated_at")),
                 "body_preview": truncate(item.get("body"), 200),
             })
         return json.dumps({
