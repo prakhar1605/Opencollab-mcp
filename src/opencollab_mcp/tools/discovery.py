@@ -12,6 +12,12 @@ from ..github_client import github_get, github_search, handle_github_error
 from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
+_FIND_ISSUES_SORT_MAPPINGS: dict[str, dict[str, str]] = {
+    "newest": {"sort": "created", "order": "desc"},
+    "recently_updated": {"sort": "updated", "order": "desc"},
+    "least_discussed": {"sort": "comments", "order": "asc"},
+}
+
 
 def register(mcp: MCPServer) -> None:
 
@@ -29,6 +35,7 @@ def register(mcp: MCPServer) -> None:
         searches use the "help wanted" label. Returns up to `limit` (default 15,
         max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
+        Supports sorting by newest (default), recently_updated, or least_discussed.
         Each issue includes updated_days_ago (days since its last activity),
         or null when its update timestamp is missing or unparseable.
         """
@@ -50,11 +57,14 @@ def register(mcp: MCPServer) -> None:
             "is:public",
             "archived:false",
         ]
+        sort_params = _FIND_ISSUES_SORT_MAPPINGS.get(
+            params.sort, {"sort": "created", "order": "desc"}
+        )
         try:
             result = await github_search(
                 "issues",
                 " ".join(query_parts),
-                {"sort": "created", "order": "desc", "per_page": params.limit},
+                {**sort_params, "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)

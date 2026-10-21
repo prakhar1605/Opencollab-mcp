@@ -138,7 +138,33 @@ The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8
 For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
 `GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
+**Using Docker Compose**
 
+Create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and replace the placeholder with your GitHub token. Do not commit `.env`.
+
+Start the service:
+
+```bash
+docker compose up --build -d
+```
+
+Check the service health:
+
+```bash
+curl http://localhost:8000/health
+```
+
+To stop the service:
+
+```bash
+docker compose down
+```
 </details>
 
 ### Step 3 — Try it
@@ -174,7 +200,7 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
 
 </details>
 
