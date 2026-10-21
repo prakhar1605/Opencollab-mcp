@@ -193,7 +193,7 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged closing PR? Uses GraphQL `closedByPullRequestsReferences` when authenticated (falling back to closing-keyword matching on the REST timeline), separates plain mentions into `mentioned_in_prs`, and reports `linked_prs_checked` and `linked_prs_source`. |
+| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged closing PR? Uses GraphQL `closedByPullRequestsReferences` when authenticated (falling back to closing-keyword matching across paginated REST timeline pages), separates plain mentions into `mentioned_in_prs`, and reports `linked_prs_checked`, `linked_prs_source`, and `timeline_truncated` when the timeline cap is reached. |
 | `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, PR template preview (`null` when unavailable), and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
 
 </details>
