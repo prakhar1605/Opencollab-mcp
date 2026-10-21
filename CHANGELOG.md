@@ -15,6 +15,8 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- `sort` option for `opencollab_find_issues`: `newest` (default), `recently_updated` or `least_discussed` ([#219](https://github.com/prakhar1605/Opencollab-mcp/pull/219))
+- `docker-compose.yml` example and README instructions for the HTTP transport ([#218](https://github.com/prakhar1605/Opencollab-mcp/pull/218))
 - `find_issues` reports `updated_days_ago` (days since last activity, `null` when missing) for each issue ([#217](https://github.com/prakhar1605/Opencollab-mcp/pull/217))
 - `parse_github_url` helper that parses repository, issue and pull request URLs without network calls ([#201](https://github.com/prakhar1605/Opencollab-mcp/pull/201))
 - `.dockerignore` keeps the Docker build context small ([#202](https://github.com/prakhar1605/Opencollab-mcp/pull/202))
