@@ -15,6 +15,9 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- `exclude_repos` option (up to 10 `owner/name` entries) for `opencollab_find_issues` ([#221](https://github.com/prakhar1605/Opencollab-mcp/pull/221))
+- `CONTRIBUTING.md` with setup, workflow and PR guidelines ([#220](https://github.com/prakhar1605/Opencollab-mcp/pull/220))
+- `opencollab_match_me` reports `repos_analyzed`, `repos_total` and a note when only part of a profile's repositories was scanned ([#195](https://github.com/prakhar1605/Opencollab-mcp/pull/195))
 - `sort` option for `opencollab_find_issues`: `newest` (default), `recently_updated` or `least_discussed` ([#219](https://github.com/prakhar1605/Opencollab-mcp/pull/219))
 - `docker-compose.yml` example and README instructions for the HTTP transport ([#218](https://github.com/prakhar1605/Opencollab-mcp/pull/218))
 - `find_issues` reports `updated_days_ago` (days since last activity, `null` when missing) for each issue ([#217](https://github.com/prakhar1605/Opencollab-mcp/pull/217))
