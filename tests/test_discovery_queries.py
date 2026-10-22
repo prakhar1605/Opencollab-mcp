@@ -270,3 +270,24 @@ async def test_find_issues_sort_mappings(
     assert len(captured_params) == 1
     assert captured_params[0]["sort"] == expected_sort
     assert captured_params[0]["order"] == expected_order
+
+
+@pytest.mark.asyncio
+async def test_find_issues_excludes_requested_repositories(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {
+        "language": "Python", "exclude_repos": ["a/b", "example-org/repo.name"],
+    }})
+    assert captured_queries
+    assert "-repo:a/b" in captured_queries[0].split()
+    assert "-repo:example-org/repo.name" in captured_queries[0].split()
+    assert "no:assignee" in captured_queries[0].split()
+
+
+@pytest.mark.asyncio
+async def test_empty_repository_exclusions_preserve_query(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+    await _call(server, "opencollab_find_issues", {"params": {
+        "language": "Python", "exclude_repos": [],
+    }})
+    assert len(captured_queries) == 2
+    assert captured_queries[0] == captured_queries[1]

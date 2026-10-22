@@ -11,7 +11,7 @@
 
 6 focused tools. Works with Claude Desktop, Cursor, VS Code, or any MCP-compatible client.
 
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -200,7 +200,13 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+
+`opencollab_match_me` scans up to 100 most recently pushed public repositories,
+excluding forks from language analysis. If the scan is incomplete, its response
+includes `repos_analyzed` (the raw number returned, including forks), `repos_total`
+and a `note` explaining the limit. These fields are omitted for a complete scan;
+the separate Python fallback note still appears when no language is detected.
 
 </details>
 

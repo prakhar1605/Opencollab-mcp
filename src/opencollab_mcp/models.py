@@ -140,6 +140,25 @@ class LanguageInput(BaseModel):
     )
 
 
+    exclude_repos: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Repositories to exclude as owner/name (at most 10)",
+    )
+
+    @field_validator("exclude_repos")
+    @classmethod
+    def validate_exclude_repos(cls, values: list[str]) -> list[str]:
+        for value in values:
+            owner, separator, repo = value.partition("/")
+            if not separator:
+                raise ValueError("excluded repositories must use owner/name")
+            parsed = RepoInput(owner=owner, repo=repo)
+            if value != f"{parsed.owner}/{parsed.repo}":
+                raise ValueError("excluded repositories must not contain whitespace")
+        return values
+
+
 class ImpactEstimate(BaseModel):
     """Structured result of `opencollab_impact_estimator`."""
 
