@@ -157,3 +157,17 @@ def test_language_input_accepts_max_age_days_bounds(days):
 def test_language_input_rejects_invalid_max_age_days(days):
     with pytest.raises(ValidationError):
         LanguageInput(language="Python", max_age_days=days)
+
+def test_language_input_sort_default():
+    assert LanguageInput(language="Python").sort == "newest"
+
+
+@pytest.mark.parametrize("sort", ["newest", "recently_updated", "least_discussed"])
+def test_language_input_accepts_valid_sort(sort):
+    assert LanguageInput(language="Python", sort=sort).sort == sort
+
+
+@pytest.mark.parametrize("sort", ["oldest", "most_stars", "random", "", 123])
+def test_language_input_rejects_invalid_sort(sort):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", sort=sort)

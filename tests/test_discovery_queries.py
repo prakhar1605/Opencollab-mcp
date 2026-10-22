@@ -236,3 +236,37 @@ async def test_find_issues_uses_requested_age(server, captured_queries, days):
     await _call(server, "opencollab_find_issues", {"params": params})
     assert len(captured_queries) == 1
     assert f"created:>{expected_since}" in captured_queries[0].split()
+
+
+# ---- sort (#177) -----------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_find_issues_sort_defaults_to_newest(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    assert len(captured_params) == 1
+    assert captured_params[0]["sort"] == "created"
+    assert captured_params[0]["order"] == "desc"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "sort_value, expected_sort, expected_order",
+    [
+        ("newest", "created", "desc"),
+        ("recently_updated", "updated", "desc"),
+        ("least_discussed", "comments", "asc"),
+    ],
+)
+async def test_find_issues_sort_mappings(
+    server, captured_params, sort_value, expected_sort, expected_order
+):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "sort": sort_value}},
+    )
+
+    assert len(captured_params) == 1
+    assert captured_params[0]["sort"] == expected_sort
+    assert captured_params[0]["order"] == expected_order

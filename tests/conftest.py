@@ -12,13 +12,17 @@ from opencollab_mcp import github_client
 
 
 @pytest.fixture(autouse=True)
-def _reset_client_state():
-    """Every test gets a clean cache and a fresh HTTP client.
+def _reset_client_state(monkeypatch):
+    """Every test gets a clean cache, clean auth env, and a fresh HTTP client.
 
     Resetting the client matters as much as the cache: it is shared and
     lazily created, so without this a test could reuse a client built by an
     earlier test — one that was not built through this test's mock transport.
+    Clearing ambient token variables ensures tests never depend on the
+    developer's shell environment.
     """
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
     github_client.clear_cache()
     github_client.reset_client()
     yield
@@ -31,9 +35,10 @@ def mock_github(monkeypatch) -> Callable[[dict[str, Any]], None]:
     """Install a mock GitHub responder.
 
     Pass a dict mapping `path` (the part after https://api.github.com) to
-    either a JSON-able value or a (status, value) tuple. Query strings are
-    stripped before matching, so '/users/foo' matches both '/users/foo'
-    and '/users/foo?per_page=10'.
+    a JSON-able value, a `(status, value)` tuple, or a callable accepting the
+    `httpx.Request` and returning an `httpx.Response` (or `(status, value)`).
+    Query strings are stripped before matching, so '/users/foo' matches both
+    '/users/foo' and '/users/foo?per_page=10'.
     """
 
     routes: dict[str, Any] = {}
@@ -46,6 +51,10 @@ def mock_github(monkeypatch) -> Callable[[dict[str, Any]], None]:
         if path not in routes:
             return httpx.Response(404, json={"message": "Not Found (mock)"})
         spec = routes[path]
+        if callable(spec):
+            spec = spec(request)
+            if isinstance(spec, httpx.Response):
+                return spec
         if isinstance(spec, tuple):
             status, body = spec
         else:

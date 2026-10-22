@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Changes merged since v0.6.1.
 
 ### Added
+- Optional `sort` parameter for `find_issues` (`newest` [default], `recently_updated`, `least_discussed`) mapped to GitHub search sorting ([#177](https://github.com/prakhar1605/Opencollab-mcp/issues/177)).
+- `find_issues` reports nullable `updated_days_ago` using the existing timestamp helper.
+- Pure `parse_github_url` helper for repository, issue and pull request URLs, with validation and no network calls ([#185](https://github.com/prakhar1605/Opencollab-mcp/issues/185)).
 - `--version` and `-V` command-line flags ([#51](https://github.com/prakhar1605/Opencollab-mcp/pull/51))
 - `/health` endpoint, plus cache TTL and eviction tests ([#44](https://github.com/prakhar1605/Opencollab-mcp/pull/44))
 - Difficulty option for `opencollab_match_me`, matching `find_issues` ([#39](https://github.com/prakhar1605/Opencollab-mcp/pull/39))
@@ -25,6 +28,8 @@ Changes merged since v0.6.1.
 
 ### Fixed
 - `opencollab_match_me` now reports a partial repository scan with `repos_analyzed`, `repos_total` and a note when the profile has more repositories than the returned page ([#180](https://github.com/prakhar1605/Opencollab-mcp/issues/180))
+- `opencollab_check_issue_availability` now paginates issue timelines via shared `github_get_all` `Link: rel="next"` pagination (up to 5 pages / 500 events) instead of truncating silently at 100 events, reporting `timeline_truncated: true` and softening `reason` when the cap is hit ([#203](https://github.com/prakhar1605/Opencollab-mcp/issues/203))
+- `opencollab_check_issue_availability` now distinguishes closing PRs from plain issue mentions: uses GraphQL `closedByPullRequestsReferences` when authenticated, falls back to closing-keyword parsing on REST timeline events when unauthenticated or when GraphQL fails, reports non-closing mentions separately in `mentioned_in_prs` without blocking availability, and exposes `linked_prs_source` ([#204](https://github.com/prakhar1605/Opencollab-mcp/issues/204))
 - Docker health check now uses the configured `PORT` instead of always 8000 ([#73](https://github.com/prakhar1605/Opencollab-mcp/pull/73))
 - `check_issue_availability` now reports timeline failures and reads 100 events ([#43](https://github.com/prakhar1605/Opencollab-mcp/pull/43))
 - Issues are marked unavailable when a linked PR was already merged ([#40](https://github.com/prakhar1605/Opencollab-mcp/pull/40))

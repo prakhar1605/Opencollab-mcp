@@ -1,0 +1,22 @@
+services:
+  opencollab-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      TRANSPORT: streamable-http
+      PORT: "8000"
+      OPENCOLLAB_LOG_LEVEL: INFO
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8000'), timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

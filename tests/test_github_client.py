@@ -543,3 +543,305 @@ async def test_rate_limit_warns_on_202_response(monkeypatch, caplog):
 
     assert result == {}
     assert len(messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_github_graphql_returns_data(mock_github, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_valid")
+    captured = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["auth"] = request.headers.get("Authorization")
+        return httpx.Response(200, json={"data": {"viewer": {"login": "octocat"}}})
+
+    mock_github({"/graphql": _handler})
+    data = await github_client.github_graphql("query { viewer { login } }", {"x": 1})
+    assert data == {"viewer": {"login": "octocat"}}
+    assert captured == {"method": "POST", "auth": "Bearer ghp_valid"}
+
+
+@pytest.mark.parametrize(
+    ("error_entry", "headers", "expected_substr"),
+    [
+        (
+            {"type": "NOT_FOUND", "message": "Could not resolve to an Issue with the number of 9."},
+            {},
+            "not found",
+        ),
+        (
+            {"type": "RATE_LIMITED", "message": "API rate limit exceeded"},
+            {"x-ratelimit-reset": str(int(time.time()) + 600)},
+            "rate limit exceeded",
+        ),
+        (
+            {"type": "FORBIDDEN", "message": "Resource not accessible by integration"},
+            {},
+            "denied access",
+        ),
+        (
+            {"type": "INSUFFICIENT_SCOPES", "message": "Missing public_repo scope"},
+            {},
+            "public_repo",
+        ),
+        (
+            {"message": "Requires authentication"},
+            {},
+            "authentication failed",
+        ),
+        (
+            {"message": "Field 'bad' doesn't exist on type 'Issue'"},
+            {},
+            "Field 'bad' doesn't exist on type 'Issue'",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_github_graphql_http_200_errors_map_to_friendly_messages(
+    mock_github, caplog, error_entry, headers, expected_substr
+):
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers=headers, json={"errors": [error_entry]})
+
+    mock_github({"/graphql": _handler})
+    with pytest.raises(github_client.GitHubGraphQLError) as exc:
+        await github_client.github_graphql("query { viewer { login } }")
+
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        friendly = github_client.handle_github_error(exc.value)
+
+    assert expected_substr.lower() in friendly.lower()
+    # Expected GraphQL errors warn cleanly without noisy Python tracebacks.
+    records = [r for r in caplog.records if r.name == "opencollab_mcp.github"]
+    assert records and all(r.exc_info is None for r in records)
+
+
+@pytest.mark.asyncio
+async def test_graphql_rate_limit_tracked_independently_from_rest(mock_github, caplog):
+    def _graphql_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "graphql", "x-ratelimit-remaining": "3"},
+            json={"data": {"ok": True}},
+        )
+
+    def _rest_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "core", "x-ratelimit-remaining": "4999"},
+            json={"ok": True},
+        )
+
+    mock_github({"/graphql": _graphql_handler, "/users/octocat": _rest_handler})
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
+        await github_client.github_graphql("query { ok }")
+        # Healthy core REST quota must NOT reset the low GraphQL quota warning state.
+        await github_client.github_get("/users/octocat", use_cache=False)
+        await github_client.github_graphql("query { ok }")
+
+    warnings = [r.getMessage() for r in caplog.records if "quota is running low" in r.getMessage()]
+    assert len(warnings) == 1
+    assert "graphql" in warnings[0].lower()
+
+
+@pytest.mark.asyncio
+async def test_github_graphql_retries_once_on_transient_503(mock_github, monkeypatch):
+    calls = {"n": 0}
+    monkeypatch.setattr(github_client, "GITHUB_RETRY_DELAY_SECONDS", 0)
+
+    def _flaky_graphql(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(503, text="Service Unavailable")
+        return httpx.Response(
+            200,
+            headers={"x-ratelimit-resource": "graphql", "x-ratelimit-remaining": "4999"},
+            json={"data": {"ok": True}},
+        )
+
+    mock_github({"/graphql": _flaky_graphql})
+    data = await github_client.github_graphql("query { ok }")
+    assert data == {"ok": True}
+    assert calls["n"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_response",
+    [
+        httpx.Response(200, text="<html>bad gateway proxy</html>"),
+        httpx.Response(200, json=["unexpected", "list"]),
+    ],
+)
+async def test_github_graphql_rejects_malformed_json_payloads(mock_github, bad_response):
+    mock_github({"/graphql": lambda _req: bad_response})
+    with pytest.raises(github_client.GitHubGraphQLError):
+        await github_client.github_graphql("query { ok }")
+
+
+@pytest.mark.asyncio
+async def test_github_get_all_single_page_makes_one_request(mock_github):
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json=[{"id": 1}, {"id": 2}])
+
+    mock_github({"/items": _handler})
+    items, truncated = await github_client.github_get_all("/items", {"per_page": 100})
+
+    assert items == [{"id": 1}, {"id": 2}]
+    assert truncated is False
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_github_get_all_follows_cursor_links_with_auth_and_retries_page_2(
+    mock_github, monkeypatch
+):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_paginated_token")
+    monkeypatch.setattr(github_client, "GITHUB_RETRY_DELAY_SECONDS", 0)
+    seen_auth: list[str | None] = []
+    seen_queries: list[str] = []
+    page2_attempts = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        seen_auth.append(request.headers.get("Authorization"))
+        seen_queries.append(request.url.query.decode("ascii"))
+        cursor = request.url.params.get("after")
+        if cursor is None:
+            return httpx.Response(
+                200,
+                json=[{"id": 1}],
+                headers={"Link": '<https://api.github.com/items?after=cur_1>; rel="next"'},
+            )
+        if cursor == "cur_1":
+            page2_attempts["n"] += 1
+            if page2_attempts["n"] == 1:
+                return httpx.Response(503, text="Transient upstream blip")
+            return httpx.Response(
+                200,
+                json=[{"id": 2}],
+                headers={"Link": '<https://api.github.com/items?after=cur_2>; rel="next"'},
+            )
+        assert cursor == "cur_2"
+        return httpx.Response(200, json=[{"id": 3}])
+
+    mock_github({"/items": _handler})
+    items, truncated = await github_client.github_get_all(
+        "/items", {"per_page": 1}, use_cache=False
+    )
+
+    assert items == [{"id": 1}, {"id": 2}, {"id": 3}]
+    assert truncated is False
+    assert page2_attempts["n"] == 2
+    assert all(h == "Bearer ghp_paginated_token" for h in seen_auth)
+    # Initial query params must NOT overwrite cursor params on subsequent pages.
+    assert seen_queries == ["per_page=1", "after=cur_1", "after=cur_1", "after=cur_2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("total_pages", "max_pages", "expect_truncated", "expect_calls"),
+    [
+        (4, 2, True, 2),   # Page 2 still has rel="next" -> truncated=True, stops at 2
+        (2, 2, False, 2),  # Page 2 has no rel="next" -> exact fit, truncated=False
+    ],
+)
+async def test_github_get_all_respects_max_pages_and_exact_fit(
+    mock_github, total_pages, max_pages, expect_truncated, expect_calls
+):
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        page = int(request.url.params.get("page", "1"))
+        headers = {}
+        if page < total_pages:
+            headers["Link"] = (
+                f'<https://api.github.com/items?per_page=1&page={page + 1}>; rel="next"'
+            )
+        return httpx.Response(200, json=[{"page": page}], headers=headers)
+
+    mock_github({"/items": _handler})
+    items, truncated = await github_client.github_get_all(
+        "/items", {"per_page": 1}, max_pages=max_pages, use_cache=False
+    )
+
+    assert calls["n"] == expect_calls
+    assert truncated is expect_truncated
+    assert items == [{"page": p} for p in range(1, expect_calls + 1)]
+
+
+@pytest.mark.asyncio
+async def test_github_get_all_caches_assembled_result_without_key_collision_or_mutation(
+    mock_github,
+):
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        page = int(request.url.params.get("page", "1"))
+        headers = (
+            {'Link': '<https://api.github.com/items?page=2>; rel="next"'}
+            if page == 1
+            else {}
+        )
+        return httpx.Response(200, json=[page], headers=headers)
+
+    mock_github({"/items": _handler})
+
+    # Populate single-page github_get cache on the exact same path first
+    single = await github_client.github_get("/items")
+    assert single == [1]
+    assert calls["n"] == 1
+
+    # github_get_all must NOT collide with single-page github_get cache
+    items, truncated = await github_client.github_get_all("/items", max_pages=5)
+    assert (items, truncated) == ([1, 2], False)
+    assert calls["n"] == 3
+
+    # Mutating returned list must not corrupt cached snapshot
+    items.append(999)
+    cached_items, cached_truncated = await github_client.github_get_all("/items", max_pages=5)
+    assert (cached_items, cached_truncated) == ([1, 2], False)
+    assert calls["n"] == 3
+
+
+@pytest.mark.asyncio
+async def test_github_get_all_rejects_untrusted_link_host_without_leaking_token(
+    monkeypatch,
+):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_super_secret")
+    requested_hosts: list[str] = []
+
+    def _transport_handler(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        return httpx.Response(
+            200,
+            json=[{"id": 1}],
+            headers={"Link": '<https://attacker.example/items?page=2>; rel="next"'},
+        )
+
+    transport = httpx.MockTransport(_transport_handler)
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda *a, **kw: real_client(*a, transport=transport, **kw)
+    )
+    github_client.reset_client()
+
+    with pytest.raises(ValueError, match="untrusted"):
+        await github_client.github_get_all("/items", use_cache=False)
+
+    assert requested_hosts == ["api.github.com"]
+
+
+@pytest.mark.asyncio
+async def test_github_get_all_validates_max_pages_and_handles_202(mock_github):
+    with pytest.raises(ValueError, match="max_pages"):
+        await github_client.github_get_all("/items", max_pages=0)
+
+    mock_github({"/computing": (202, "")})
+    items, truncated = await github_client.github_get_all("/computing")
+    assert (items, truncated) == ([], False)
+

@@ -134,6 +134,11 @@ class LanguageInput(BaseModel):
         le=365,
     )
 
+    sort: Literal["newest", "recently_updated", "least_discussed"] = Field(
+        default="newest",
+        description="Sort order: newest (default), recently_updated, or least_discussed",
+    )
+
 
 class ImpactEstimate(BaseModel):
     """Structured result of `opencollab_impact_estimator`."""
