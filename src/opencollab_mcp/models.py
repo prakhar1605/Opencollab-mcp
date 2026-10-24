@@ -9,6 +9,7 @@ MCP SDK publishes their JSON schema as the tool's `outputSchema`.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -22,12 +23,35 @@ from .constants import RECENT_ISSUES_DAYS
 LOGIN_PATTERN = r"^[A-Za-z0-9](?:[A-Za-z0-9_-]*)$"
 REPO_NAME_PATTERN = r"^[A-Za-z0-9._-]+$"
 
+_LOGIN_RE = re.compile(LOGIN_PATTERN)
+_REPO_NAME_RE = re.compile(REPO_NAME_PATTERN)
+
 
 def _reject_dot_segments(value: str) -> str:
     # '.' and '..' match REPO_NAME_PATTERN but are path traversal, not names.
     if value in (".", ".."):
         raise ValueError(f"{value!r} is not a valid repository name")
     return value
+
+
+def _validate_scope(value: str) -> str:
+    """Accept `owner` or `owner/name` using the same login/repo character sets."""
+    if "/" not in value:
+        if not _LOGIN_RE.fullmatch(value):
+            raise ValueError(
+                "scope must be an owner login (org/user) or owner/name repository"
+            )
+        return value
+
+    parts = value.split("/")
+    if len(parts) != 2:
+        raise ValueError("scope repository form must be owner/name (exactly one slash)")
+    owner, repo = parts
+    if not _LOGIN_RE.fullmatch(owner):
+        raise ValueError("scope owner part is not a valid GitHub login")
+    if not _REPO_NAME_RE.fullmatch(repo):
+        raise ValueError("scope repository part is not a valid repository name")
+    return f"{owner}/{_reject_dot_segments(repo)}"
 
 
 class MatchMeInput(BaseModel):
@@ -138,6 +162,23 @@ class LanguageInput(BaseModel):
         default="newest",
         description="Sort order: newest (default), recently_updated, or least_discussed",
     )
+
+    scope: str | None = Field(
+        default=None,
+        description=(
+            "Optional search scope: an owner login (org/user) or owner/name "
+            "(single repository). Narrows find_issues beyond language alone."
+        ),
+        min_length=1,
+        max_length=140,
+    )
+
+    @field_validator("scope")
+    @classmethod
+    def validate_scope(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _validate_scope(value)
 
 
     exclude_repos: list[str] = Field(

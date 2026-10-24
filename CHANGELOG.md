@@ -67,6 +67,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Version drift test reads package sources as UTF-8 so it passes on Windows locales that are not UTF-8 by default ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
 - `opencollab_match_me` now reports a partial repository scan with `repos_analyzed`, `repos_total` and a note when the profile has more repositories than the returned page ([#180](https://github.com/prakhar1605/Opencollab-mcp/issues/180))
 - `opencollab_check_issue_availability` now paginates issue timelines via shared `github_get_all` `Link: rel="next"` pagination (up to 5 pages / 500 events) instead of truncating silently at 100 events, reporting `timeline_truncated: true` and softening `reason` when the cap is hit ([#203](https://github.com/prakhar1605/Opencollab-mcp/issues/203))
 - `opencollab_check_issue_availability` now distinguishes closing PRs from plain issue mentions: uses GraphQL `closedByPullRequestsReferences` when authenticated, falls back to closing-keyword parsing on REST timeline events when unauthenticated or when GraphQL fails, reports non-closing mentions separately in `mentioned_in_prs` without blocking availability, and exposes `linked_prs_source` ([#204](https://github.com/prakhar1605/Opencollab-mcp/issues/204))

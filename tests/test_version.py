@@ -34,7 +34,7 @@ def test_no_hardcoded_version_literal_in_the_package():
     offenders = [
         f"{path.relative_to(SRC)}:{lineno}: {line.strip()}"
         for path in SRC.rglob("*.py")
-        for lineno, line in enumerate(path.read_text().splitlines(), start=1)
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
         if current in line and not line.lstrip().startswith("#")
     ]
 
