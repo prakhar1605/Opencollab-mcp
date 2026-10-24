@@ -8,11 +8,22 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Ubuntu keeps the plain `test (3.x)` names that branch protection requires;
+    # Windows and macOS show up as additional, non-required checks.
+    name: ${{ matrix.os == 'ubuntu-latest' && format('test ({0})', matrix.python-version) || format('test ({0}, {1})', matrix.os, matrix.python-version) }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # Keep Windows/macOS to one Python version so CI stays fast while
+          # still catching path, line-ending, and subprocess differences.
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - uses: actions/checkout@v4
