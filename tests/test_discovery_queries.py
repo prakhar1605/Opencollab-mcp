@@ -272,6 +272,49 @@ async def test_find_issues_sort_mappings(
     assert captured_params[0]["order"] == expected_order
 
 
+# ---- scope (#176) ----------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_find_issues_scope_org(server, captured_queries):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "scope": "huggingface"}},
+    )
+
+    assert len(captured_queries) == 1
+    assert "org:huggingface" in captured_queries[0].split()
+    assert "repo:" not in captured_queries[0]
+
+
+@pytest.mark.asyncio
+async def test_find_issues_scope_repo(server, captured_queries):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "scope": "pandas-dev/pandas"}},
+    )
+
+    assert len(captured_queries) == 1
+    assert "repo:pandas-dev/pandas" in captured_queries[0].split()
+    assert "org:" not in captured_queries[0]
+
+
+@pytest.mark.asyncio
+async def test_find_issues_no_scope_unchanged(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    query = captured_queries[0]
+    tokens = query.split()
+    assert not any(t.startswith("org:") or t.startswith("repo:") for t in tokens)
+    assert 'language:"Python"' in query
+    assert 'label:"good first issue"' in query
+    assert "state:open" in tokens
+    assert "no:assignee" in tokens
+    assert "is:issue" in tokens
+    assert "is:public" in tokens
+    assert "archived:false" in tokens
+
 @pytest.mark.asyncio
 async def test_find_issues_excludes_requested_repositories(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {
