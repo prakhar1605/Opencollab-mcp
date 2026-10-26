@@ -11,9 +11,14 @@ from typing import Any
 
 import pytest
 
+from opencollab_mcp.constants import (
+    BEGINNER_SEARCH_LABELS,
+    INTERMEDIATE_SEARCH_LABELS,
+)
 from opencollab_mcp.helpers import recent_date_str
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+from tests.query_utils import parse_query
 
 
 @pytest.fixture
@@ -118,7 +123,8 @@ async def test_find_issues_keeps_its_other_qualifiers(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert "created:>" in query
@@ -133,8 +139,9 @@ async def test_find_issues_intermediate_keeps_quoting_and_is_issue(server, captu
     )
 
     query = captured_queries[0]
+    query_dict = parse_query(query)
     assert 'language:"Jupyter Notebook"' in query
-    assert 'label:"help wanted"' in query
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -152,8 +159,9 @@ async def test_match_me_intermediate_sends_help_wanted(server, captured_queries,
     )
 
     query = captured_queries[0]
-    assert 'label:"help wanted"' in query
-    assert 'label:"good first issue"' not in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
+    assert not any(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -167,7 +175,8 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     await _call(server, "opencollab_match_me", {"params": {"username": "rustacean"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert f"created:>{recent_date_str(90)}" in query
@@ -305,10 +314,11 @@ async def test_find_issues_no_scope_unchanged(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
 
     query = captured_queries[0]
+    query_dict = parse_query(query)
     tokens = query.split()
     assert not any(t.startswith("org:") or t.startswith("repo:") for t in tokens)
     assert 'language:"Python"' in query
-    assert 'label:"good first issue"' in query
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in tokens
     assert "no:assignee" in tokens
     assert "is:issue" in tokens
