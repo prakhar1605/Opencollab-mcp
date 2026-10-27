@@ -7,14 +7,14 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
-from .constants import (
-    BEGINNER_SEARCH_LABELS,
-    INTERMEDIATE_SEARCH_LABELS
-)
+
+from .constants import BEGINNER_SEARCH_LABELS, INTERMEDIATE_SEARCH_LABELS
+
 
 def difficulty_label(difficulty: str) -> str:
-    result=", ".join(BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS)
-    return 'label:'+result
+    labels = BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS
+    result = ",".join(f'"{label}"' for label in labels)
+    return f"label:{result}"
 
 
 def days_ago(iso_str: str | None) -> int | None:

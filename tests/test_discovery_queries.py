@@ -326,6 +326,13 @@ async def test_find_issues_no_scope_unchanged(server, captured_queries):
     assert "archived:false" in tokens
 
 @pytest.mark.asyncio
+async def test_find_issues_beginner_label_string_is_exact(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
+
+    expected_label = 'label:"good first issue","good-first-issue","beginner","first-timers-only"'
+    assert expected_label in captured_queries[0]
+
+@pytest.mark.asyncio
 async def test_find_issues_excludes_requested_repositories(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {
         "language": "Python", "exclude_repos": ["a/b", "example-org/repo.name"],

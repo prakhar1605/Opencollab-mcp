@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 _KEY_RE = re.compile(r"-?[A-Za-z_][\w.]*:")
 
 
