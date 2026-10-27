@@ -31,8 +31,8 @@ def register(mcp: MCPServer) -> None:
     )
     async def opencollab_find_issues(params: LanguageInput) -> str:
         """Find unassigned open-source issues by language and difficulty.
-        Beginner searches use the "good first issue" label, while intermediate
-        searches use the "help wanted" label. Returns up to `limit` (default 15,
+        Beginner searches use the "good first issue", "good-first-issue", "beginner", and "first-timers-only" labels, while intermediate
+        searches use the "help wanted", "help-wanted", "intermediate" labels. Returns up to `limit` (default 15,
         max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
         exclude_repos optionally omits up to 10 repositories in owner/name format.

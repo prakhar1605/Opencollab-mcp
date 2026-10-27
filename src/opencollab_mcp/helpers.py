@@ -8,9 +8,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
+from .constants import BEGINNER_SEARCH_LABELS, INTERMEDIATE_SEARCH_LABELS
+
 
 def difficulty_label(difficulty: str) -> str:
-    return 'label:"good first issue"' if difficulty == "beginner" else 'label:"help wanted"'
+    labels = BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS
+    result = ",".join(f'"{label}"' for label in labels)
+    return f"label:{result}"
 
 
 def days_ago(iso_str: str | None) -> int | None:
