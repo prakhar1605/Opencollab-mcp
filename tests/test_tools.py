@@ -13,8 +13,13 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from opencollab_mcp.constants import (
+    BEGINNER_SEARCH_LABELS,
+    INTERMEDIATE_SEARCH_LABELS,
+)
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+from tests.query_utils import parse_query
 
 
 def _days_ago_iso(days: int) -> str:
@@ -386,8 +391,9 @@ async def test_find_issues_intermediate_uses_help_wanted(monkeypatch):
         {"params": {"language": "Python", "difficulty": "intermediate"}},
     )
 
-    assert 'label:"help wanted"' in captured_query
-    assert 'label:"good first issue"' not in captured_query
+    query_labels = parse_query(captured_query)["label"]
+    assert all(label in query_labels for label in INTERMEDIATE_SEARCH_LABELS)
+    assert not any(label in query_labels for label in BEGINNER_SEARCH_LABELS)
 
 @pytest.mark.asyncio
 async def test_generate_pr_plan_finds_contributing_in_dot_github(mock_github):

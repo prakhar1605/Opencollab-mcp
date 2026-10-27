@@ -44,6 +44,17 @@ WARNING_ISSUE_LABELS = frozenset({
     "needs discussion",
     "on hold",
 })
+BEGINNER_SEARCH_LABELS = (
+    "good first issue",
+    "good-first-issue",
+    "beginner",
+    "first-timers-only"
+)
+INTERMEDIATE_SEARCH_LABELS = (
+    "help wanted",
+    "help-wanted",
+    "intermediate"
+)
 
 # ---- PR planning previews ----
 PR_PLAN_ISSUE_BODY_LIMIT = 1500

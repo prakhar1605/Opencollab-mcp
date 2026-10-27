@@ -59,7 +59,7 @@ class MatchMeInput(BaseModel):
     username: str = Field(..., description="GitHub username", min_length=1, max_length=39, pattern=LOGIN_PATTERN,)
     difficulty: Literal["beginner", "intermediate"] = Field(
         default="beginner",
-        description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
+        description='beginner searches label:"good first issue","good-first-issue","beginner","first-timers-only"; intermediate searches label:"help wanted","help-wanted","intermediate"',
     )
     limit: int = Field(
         default=10,
@@ -141,7 +141,7 @@ class LanguageInput(BaseModel):
 
     difficulty: Literal["beginner", "intermediate"] = Field(
         default="beginner",
-        description='beginner searches label:"good first issue"; intermediate searches label:"help wanted"',
+        description='beginner searches label:"good first issue", "good-first-issue", "beginner", "first-timers-only"; intermediate searches label:"help wanted", "help-wanted", "intermediate"',
     )
 
     limit: int = Field(
