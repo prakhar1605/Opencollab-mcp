@@ -506,6 +506,34 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
 
 
 @pytest.mark.asyncio
+async def test_generate_pr_plan_null_user(mock_github):
+    """GitHub may return `"user": null`; that must not raise AttributeError."""
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Orphaned issue",
+            "body": "Reporter deleted",
+            "labels": [],
+            "state": "open",
+            "user": None,
+            "comments": 1,
+        },
+        "/repos/o/r/issues/7/comments": [
+            {"user": None, "body": "Anonymous follow-up", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    assert not result.is_error
+    plan = json.loads(_extract_text(result))
+    assert plan["issue"]["author"] == "unknown"
+    assert len(plan["comments"]) == 1
+    assert plan["comments"][0]["author"] == "unknown"
+    assert plan["comments"][0]["body"] == "Anonymous follow-up"
+
 
 @pytest.mark.asyncio
 async def test_impact_estimator_returns_structured_content(mock_github):
