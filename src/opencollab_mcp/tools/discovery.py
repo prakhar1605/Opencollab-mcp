@@ -132,6 +132,21 @@ def register(mcp: MCPServer) -> None:
         except Exception as e:
             return handle_github_error(e)
 
+        # Orgs share the /users/{login} endpoint; matching their repos as a
+        # person's "skills" misleads the assistant into "based on your skills…".
+        if user.get("type") == "Organization":
+            return json.dumps(
+                {
+                    "error": (
+                        f"'{params.username}' is an organization, not a user. "
+                        "Pass a personal GitHub username, or use "
+                        f"opencollab_find_issues with scope='{params.username}' "
+                        "to search this org."
+                    ),
+                },
+                indent=2,
+            )
+
         lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
