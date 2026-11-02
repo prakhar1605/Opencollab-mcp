@@ -9,6 +9,9 @@ import pytest
 from opencollab_mcp.helpers import (
     days_ago,
     decode_base64_content,
+    github_user,
+    is_bot_user,
+    login_of,
     parse_issue_number,
     recent_date_str,
     truncate,
@@ -104,6 +107,46 @@ class TestParseIssueNumber:
         # the friendly ValueError, not slip through as an int.
         with pytest.raises(ValueError):
             parse_issue_number("12²")
+
+
+class TestGithubUser:
+    def test_null_user(self):
+        assert github_user({"user": None}) == {}
+
+    def test_missing_user(self):
+        assert github_user({}) == {}
+
+    def test_non_dict_obj(self):
+        assert github_user(None) == {}
+
+    def test_returns_user_dict(self):
+        user = {"login": "alice", "type": "User"}
+        assert github_user({"user": user}) is user
+
+
+class TestLoginOf:
+    def test_null_user_defaults_unknown(self):
+        assert login_of({"user": None}) == "unknown"
+
+    def test_empty_login_defaults(self):
+        assert login_of({"user": {"login": ""}}, default="nobody") == "nobody"
+
+    def test_login(self):
+        assert login_of({"user": {"login": "alice"}}) == "alice"
+
+
+class TestIsBotUser:
+    def test_null_user_is_not_bot(self):
+        assert is_bot_user({"user": None}) is False
+
+    def test_bot_type(self):
+        assert is_bot_user({"user": {"login": "triage", "type": "Bot"}}) is True
+
+    def test_bot_suffix(self):
+        assert is_bot_user({"user": {"login": "cla[bot]", "type": "User"}}) is True
+
+    def test_human(self):
+        assert is_bot_user({"user": {"login": "alice", "type": "User"}}) is False
 
 
 class TestDecodeBase64:

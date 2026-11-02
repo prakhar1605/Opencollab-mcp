@@ -29,6 +29,8 @@ from ..helpers import (
     days_ago,
     decode_base64_content,
     extract_issue_repo,
+    is_bot_user,
+    login_of,
     parse_issue_number,
     pr_closes_issue,
     truncate,
@@ -164,11 +166,7 @@ def _extract_timeline_prs(
             "pr_number": pr_number,
             "title": issue_obj.get("title", ""),
             "state": issue_obj.get("state", "unknown"),
-            "author": (
-                issue_obj.get("user", {}).get("login", "unknown")
-                if isinstance(issue_obj.get("user"), dict)
-                else "unknown"
-            ),
+            "author": login_of(issue_obj),
             "merged": merged,
         }
         if dedup_key in entries:
@@ -532,13 +530,12 @@ def register(mcp: MCPServer) -> None:
 
         comments = [
             {
-                "author": c.get("user", {}).get("login", "unknown"),
+                "author": login_of(c),
                 "body": truncate(c.get("body"), 300),
                 "created_days_ago": days_ago(c.get("created_at")),
             }
             for c in comments_raw
-            if c.get("user", {}).get("type") != "Bot"
-            and not c.get("user", {}).get("login", "").endswith("[bot]")
+            if not is_bot_user(c)
         ]
         labels = [lb.get("name", "") for lb in issue.get("labels", [])]
         body = issue.get("body") or ""
@@ -554,7 +551,7 @@ def register(mcp: MCPServer) -> None:
                 "body_length": len(body),
                 "labels": labels,
                 "state": issue.get("state"),
-                "author": issue.get("user", {}).get("login", "unknown"),
+                "author": login_of(issue),
                 "created_days_ago": days_ago(issue.get("created_at")),
                 "comments_count": issue.get("comments", 0),
             },
