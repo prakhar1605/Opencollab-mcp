@@ -93,6 +93,33 @@ def decode_base64_content(content_obj: dict) -> str:
     return _base64.b64decode(content_obj.get("content", "")).decode("utf-8", errors="replace")
 
 
+def github_user(obj: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the nested `user` object, or `{}` when it is missing or null.
+
+    GitHub's REST schema marks issue/comment `user` as nullable. `.get("user", {})`
+    only helps when the key is absent; a present `null` still yields `None`.
+    """
+    if not isinstance(obj, dict):
+        return {}
+    user = obj.get("user")
+    return user if isinstance(user, dict) else {}
+
+
+def login_of(obj: dict[str, Any] | None, default: str = "unknown") -> str:
+    """Login from a GitHub object that may have a null `user`."""
+    login = github_user(obj).get("login")
+    return login if isinstance(login, str) and login else default
+
+
+def is_bot_user(obj: dict[str, Any] | None) -> bool:
+    """True when the object's user is a Bot or a `[bot]` login."""
+    user = github_user(obj)
+    if user.get("type") == "Bot":
+        return True
+    login = user.get("login") or ""
+    return isinstance(login, str) and login.endswith("[bot]")
+
+
 # HTML comments and code spans/blocks inside PR descriptions do not create
 # GitHub closing links (e.g. unfilled template hints like `<!-- Closes #12 -->`
 # or prose notes like ``did not write `Closes #12` intentionally``).
