@@ -70,6 +70,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- `find_issues` and `match_me` no longer suggest issues carrying a blocking label (`wontfix`, `duplicate`, `invalid`, `blocked`, …), derived from the same list `check_issue_availability` uses ([#271](https://github.com/prakhar1605/Opencollab-mcp/pull/271))
 - `opencollab_match_me` rejects organization logins with a pointer to `find_issues` + `scope` ([#269](https://github.com/prakhar1605/Opencollab-mcp/pull/269))
 - `generate_pr_plan` no longer crashes when GitHub returns `"user": null` for a deleted account; the author shows as `unknown` ([#267](https://github.com/prakhar1605/Opencollab-mcp/pull/267))
 - Version drift test reads package sources as UTF-8 so it passes on Windows locales that are not UTF-8 by default ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
