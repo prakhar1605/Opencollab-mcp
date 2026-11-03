@@ -8,13 +8,28 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
-from .constants import BEGINNER_SEARCH_LABELS, INTERMEDIATE_SEARCH_LABELS
+from .constants import BEGINNER_SEARCH_LABELS, BLOCKING_ISSUE_LABELS, INTERMEDIATE_SEARCH_LABELS
 
 
 def difficulty_label(difficulty: str) -> str:
     labels = BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS
     result = ",".join(f'"{label}"' for label in labels)
     return f"label:{result}"
+
+
+def blocking_labels_query() -> str:
+    # Availability normalizes spaces, hyphens and underscores; search needs
+    # explicit spellings. Keep these common variants short rather than trying
+    # to enumerate every repository's possible custom label names.
+    labels = {
+        label.replace(" ", separator)
+        for label in BLOCKING_ISSUE_LABELS
+        for separator in (" ", "-", "_")
+    }
+    if "wontfix" in BLOCKING_ISSUE_LABELS:
+        labels.update({"wont-fix", "wont_fix"})
+    # Separate negative qualifiers exclude any blocking label without ORs.
+    return " ".join(f'-label:"{label}"' for label in sorted(labels))
 
 
 def days_ago(iso_str: str | None) -> int | None:
