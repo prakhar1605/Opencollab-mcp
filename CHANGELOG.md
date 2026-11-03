@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- CI builds the Docker image on pull requests and checks that the container becomes healthy ([#268](https://github.com/prakhar1605/Opencollab-mcp/pull/268))
 - Issue discovery also matches common label spellings (`good-first-issue`, `beginner`, `first-timers-only`; `help-wanted`, `intermediate`) ([#225](https://github.com/prakhar1605/Opencollab-mcp/pull/225))
 - Optional `scope` (an owner or `owner/name`) for `opencollab_find_issues` ([#223](https://github.com/prakhar1605/Opencollab-mcp/pull/223))
 - CI also runs the tests on Windows and macOS ([#222](https://github.com/prakhar1605/Opencollab-mcp/pull/222))
@@ -54,6 +55,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 
 ### Changed
+- `impact_estimator` visibility-score thresholds moved to named constants in `constants.py`, behaviour unchanged ([#270](https://github.com/prakhar1605/Opencollab-mcp/pull/270))
 - `repo_health` scoring thresholds moved to named constants in `constants.py`, behaviour unchanged ([#146](https://github.com/prakhar1605/Opencollab-mcp/pull/146))
 - CI also tests Python 3.13 ([#41](https://github.com/prakhar1605/Opencollab-mcp/pull/41))
 - `opencollab_impact_estimator` returns MCP structured output (`structuredContent` and an `outputSchema`) alongside the unchanged JSON text; GitHub errors are returned as tool errors ([#163](https://github.com/prakhar1605/Opencollab-mcp/pull/163))
@@ -68,6 +70,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- `opencollab_match_me` rejects organization logins with a pointer to `find_issues` + `scope` ([#269](https://github.com/prakhar1605/Opencollab-mcp/pull/269))
 - `generate_pr_plan` no longer crashes when GitHub returns `"user": null` for a deleted account; the author shows as `unknown` ([#267](https://github.com/prakhar1605/Opencollab-mcp/pull/267))
 - Version drift test reads package sources as UTF-8 so it passes on Windows locales that are not UTF-8 by default ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
 - `opencollab_match_me` now reports a partial repository scan with `repos_analyzed`, `repos_total` and a note when the profile has more repositories than the returned page ([#180](https://github.com/prakhar1605/Opencollab-mcp/issues/180))
