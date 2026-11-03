@@ -157,3 +157,40 @@ def test_language_input_accepts_max_age_days_bounds(days):
 def test_language_input_rejects_invalid_max_age_days(days):
     with pytest.raises(ValidationError):
         LanguageInput(language="Python", max_age_days=days)
+
+def test_language_input_sort_default():
+    assert LanguageInput(language="Python").sort == "newest"
+
+
+@pytest.mark.parametrize("sort", ["newest", "recently_updated", "least_discussed"])
+def test_language_input_accepts_valid_sort(sort):
+    assert LanguageInput(language="Python", sort=sort).sort == sort
+
+
+@pytest.mark.parametrize("sort", ["oldest", "most_stars", "random", "", 123])
+def test_language_input_rejects_invalid_sort(sort):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", sort=sort)
+
+
+def test_language_input_scope_defaults_to_none():
+    assert LanguageInput(language="Python").scope is None
+
+
+@pytest.mark.parametrize("scope", ["huggingface", "pandas-dev", "octocat"])
+def test_language_input_accepts_owner_scope(scope):
+    assert LanguageInput(language="Python", scope=scope).scope == scope
+
+
+@pytest.mark.parametrize("scope", ["pandas-dev/pandas", "facebook/react", "some-org/.github"])
+def test_language_input_accepts_repo_scope(scope):
+    assert LanguageInput(language="Python", scope=scope).scope == scope
+
+
+@pytest.mark.parametrize(
+    "scope",
+    ["a b", "a/b/c", "octo cat", "-bad", "face/book/extra", "owner/..", "owner/.", ""],
+)
+def test_language_input_rejects_invalid_scope(scope):
+    with pytest.raises(ValidationError):
+        LanguageInput(language="Python", scope=scope)

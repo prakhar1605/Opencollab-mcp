@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting help
+    url: https://github.com/prakhar1605/Opencollab-mcp#troubleshooting
+    about: Check the README troubleshooting section before opening a bug report.

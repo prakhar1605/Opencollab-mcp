@@ -11,9 +11,14 @@ from typing import Any
 
 import pytest
 
+from opencollab_mcp.constants import (
+    BEGINNER_SEARCH_LABELS,
+    INTERMEDIATE_SEARCH_LABELS,
+)
 from opencollab_mcp.helpers import recent_date_str
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+from tests.query_utils import parse_query
 
 
 @pytest.fixture
@@ -118,7 +123,8 @@ async def test_find_issues_keeps_its_other_qualifiers(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert "created:>" in query
@@ -133,8 +139,9 @@ async def test_find_issues_intermediate_keeps_quoting_and_is_issue(server, captu
     )
 
     query = captured_queries[0]
+    query_dict = parse_query(query)
     assert 'language:"Jupyter Notebook"' in query
-    assert 'label:"help wanted"' in query
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -152,8 +159,9 @@ async def test_match_me_intermediate_sends_help_wanted(server, captured_queries,
     )
 
     query = captured_queries[0]
-    assert 'label:"help wanted"' in query
-    assert 'label:"good first issue"' not in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
+    assert not any(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -167,7 +175,8 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     await _call(server, "opencollab_match_me", {"params": {"username": "rustacean"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert f"created:>{recent_date_str(90)}" in query
@@ -236,3 +245,109 @@ async def test_find_issues_uses_requested_age(server, captured_queries, days):
     await _call(server, "opencollab_find_issues", {"params": params})
     assert len(captured_queries) == 1
     assert f"created:>{expected_since}" in captured_queries[0].split()
+
+
+# ---- sort (#177) -----------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_find_issues_sort_defaults_to_newest(server, captured_params):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    assert len(captured_params) == 1
+    assert captured_params[0]["sort"] == "created"
+    assert captured_params[0]["order"] == "desc"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "sort_value, expected_sort, expected_order",
+    [
+        ("newest", "created", "desc"),
+        ("recently_updated", "updated", "desc"),
+        ("least_discussed", "comments", "asc"),
+    ],
+)
+async def test_find_issues_sort_mappings(
+    server, captured_params, sort_value, expected_sort, expected_order
+):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "sort": sort_value}},
+    )
+
+    assert len(captured_params) == 1
+    assert captured_params[0]["sort"] == expected_sort
+    assert captured_params[0]["order"] == expected_order
+
+
+# ---- scope (#176) ----------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_find_issues_scope_org(server, captured_queries):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "scope": "huggingface"}},
+    )
+
+    assert len(captured_queries) == 1
+    assert "org:huggingface" in captured_queries[0].split()
+    assert "repo:" not in captured_queries[0]
+
+
+@pytest.mark.asyncio
+async def test_find_issues_scope_repo(server, captured_queries):
+    await _call(
+        server,
+        "opencollab_find_issues",
+        {"params": {"language": "Python", "scope": "pandas-dev/pandas"}},
+    )
+
+    assert len(captured_queries) == 1
+    assert "repo:pandas-dev/pandas" in captured_queries[0].split()
+    assert "org:" not in captured_queries[0]
+
+
+@pytest.mark.asyncio
+async def test_find_issues_no_scope_unchanged(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+
+    query = captured_queries[0]
+    query_dict = parse_query(query)
+    tokens = query.split()
+    assert not any(t.startswith("org:") or t.startswith("repo:") for t in tokens)
+    assert 'language:"Python"' in query
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
+    assert "state:open" in tokens
+    assert "no:assignee" in tokens
+    assert "is:issue" in tokens
+    assert "is:public" in tokens
+    assert "archived:false" in tokens
+
+@pytest.mark.asyncio
+async def test_find_issues_beginner_label_string_is_exact(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
+
+    expected_label = 'label:"good first issue","good-first-issue","beginner","first-timers-only"'
+    assert expected_label in captured_queries[0]
+
+@pytest.mark.asyncio
+async def test_find_issues_excludes_requested_repositories(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {
+        "language": "Python", "exclude_repos": ["a/b", "example-org/repo.name"],
+    }})
+    assert captured_queries
+    assert "-repo:a/b" in captured_queries[0].split()
+    assert "-repo:example-org/repo.name" in captured_queries[0].split()
+    assert "no:assignee" in captured_queries[0].split()
+
+
+@pytest.mark.asyncio
+async def test_empty_repository_exclusions_preserve_query(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
+    await _call(server, "opencollab_find_issues", {"params": {
+        "language": "Python", "exclude_repos": [],
+    }})
+    assert len(captured_queries) == 2
+    assert captured_queries[0] == captured_queries[1]

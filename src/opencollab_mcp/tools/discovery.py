@@ -12,6 +12,12 @@ from ..github_client import github_get, github_search, handle_github_error
 from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
+_FIND_ISSUES_SORT_MAPPINGS: dict[str, dict[str, str]] = {
+    "newest": {"sort": "created", "order": "desc"},
+    "recently_updated": {"sort": "updated", "order": "desc"},
+    "least_discussed": {"sort": "comments", "order": "asc"},
+}
+
 
 def register(mcp: MCPServer) -> None:
 
@@ -25,10 +31,16 @@ def register(mcp: MCPServer) -> None:
     )
     async def opencollab_find_issues(params: LanguageInput) -> str:
         """Find unassigned open-source issues by language and difficulty.
-        Beginner searches use the "good first issue" label, while intermediate
-        searches use the "help wanted" label. Returns up to `limit` (default 15,
+        Beginner searches use the "good first issue", "good-first-issue", "beginner", and "first-timers-only" labels, while intermediate
+        searches use the "help wanted", "help-wanted", "intermediate" labels. Returns up to `limit` (default 15,
         max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
+        exclude_repos optionally omits up to 10 repositories in owner/name format.
+        Supports sorting by newest (default), recently_updated, or least_discussed.
+        Optional `scope` narrows the search to one organization/user (`owner`)
+        or one repository (`owner/name`); language remains required.
+        Each issue includes updated_days_ago (days since its last activity),
+        or null when its update timestamp is missing or unparseable.
         """
         since = recent_date_str(params.max_age_days)
         label = difficulty_label(params.difficulty)
@@ -47,12 +59,24 @@ def register(mcp: MCPServer) -> None:
             f"created:>{since}",
             "is:public",
             "archived:false",
+            *(f"-repo:{repo}" for repo in params.exclude_repos),
         ]
+        if params.scope:
+            # GitHub search: org: matches orgs (and often personal accounts);
+            # repo:owner/name scopes to a single repository.
+            if "/" in params.scope:
+                query_parts.append(f"repo:{params.scope}")
+            else:
+                query_parts.append(f"org:{params.scope}")
+
+        sort_params = _FIND_ISSUES_SORT_MAPPINGS.get(
+            params.sort, {"sort": "created", "order": "desc"}
+        )
         try:
             result = await github_search(
                 "issues",
                 " ".join(query_parts),
-                {"sort": "created", "order": "desc", "per_page": params.limit},
+                {**sort_params, "per_page": params.limit},
             )
         except Exception as e:
             return handle_github_error(e)
@@ -68,6 +92,7 @@ def register(mcp: MCPServer) -> None:
                 "labels": [lb.get("name", "") for lb in item.get("labels", [])],
                 "comments": item.get("comments", 0),
                 "created_days_ago": days_ago(item.get("created_at")),
+                "updated_days_ago": days_ago(item.get("updated_at")),
                 "body_preview": truncate(item.get("body"), 200),
             })
         return json.dumps({
@@ -92,6 +117,8 @@ def register(mcp: MCPServer) -> None:
 
         Detects the user's primary language and returns up to `limit`
         (default 10, max 30) matching unassigned issues from non-archived repos.
+        Scans up to 100 most recently pushed repositories. If more exist,
+        returns repos_analyzed, repos_total and a note about the partial scan.
         """
         try:
             # User and repos can be fetched in parallel.
@@ -104,6 +131,21 @@ def register(mcp: MCPServer) -> None:
             )
         except Exception as e:
             return handle_github_error(e)
+
+        # Orgs share the /users/{login} endpoint; matching their repos as a
+        # person's "skills" misleads the assistant into "based on your skills…".
+        if user.get("type") == "Organization":
+            return json.dumps(
+                {
+                    "error": (
+                        f"'{params.username}' is an organization, not a user. "
+                        "Pass a personal GitHub username, or use "
+                        f"opencollab_find_issues with scope='{params.username}' "
+                        "to search this org."
+                    ),
+                },
+                indent=2,
+            )
 
         lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()
@@ -163,15 +205,30 @@ def register(mcp: MCPServer) -> None:
             "matched_issues": issues,
             "difficulty": params.difficulty,
         }
+        notes = []
+        repos_analyzed = len(repos_raw)
+        repos_total = user.get("public_repos", repos_analyzed)
+        if repos_total > repos_analyzed:
+            # public_repos includes forks, so compare against the raw page,
+            # before excluding forks from language analysis.
+            payload["repos_analyzed"] = repos_analyzed
+            payload["repos_total"] = repos_total
+            notes.append(
+                f"Only the {repos_analyzed} most recently pushed repositories "
+                f"out of {repos_total} public repositories were scanned. "
+                "Language analysis is based on this partial sample."
+            )
         if not language_detected:
             # Present only when the fallback fired, so its presence is the
             # signal — an assistant reading the response cannot miss it the way
             # it can miss a null.
             payload["language_fallback"] = True
-            payload["note"] = (
+            notes.append(
                 "No language data was found on this profile, so the search "
                 "defaulted to Python. These matches are not based on the "
                 "user's actual skills. Ask the user which language they want "
                 "and call opencollab_find_issues with it."
             )
+        if notes:
+            payload["note"] = " ".join(notes)
         return json.dumps(payload, indent=2)

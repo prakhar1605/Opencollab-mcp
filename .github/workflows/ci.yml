@@ -8,11 +8,22 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Ubuntu keeps the plain `test (3.x)` names that branch protection requires;
+    # Windows and macOS show up as additional, non-required checks.
+    name: ${{ matrix.os == 'ubuntu-latest' && format('test ({0})', matrix.python-version) || format('test ({0}, {1})', matrix.os, matrix.python-version) }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # Keep Windows/macOS to one Python version so CI stays fast while
+          # still catching path, line-ending, and subprocess differences.
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - uses: actions/checkout@v4
@@ -59,3 +70,41 @@ jobs:
 
       - name: Test installed CLI
         run: .smoke-venv/bin/opencollab-mcp --version
+
+  docker:
+    # Separate and non-required while it is being tuned, so it can't block unrelated PRs.
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: opencollab-mcp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run --version
+        run: docker run --rm opencollab-mcp:ci --version
+
+      - name: Start container without a token
+        run: docker run -d --name opencollab-ci -p 8000:8000 opencollab-mcp:ci
+
+      - name: Wait for healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' opencollab-ci)
+            echo "health: $status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 2
+          done
+          echo "Container did not become healthy within 60s" >&2
+          docker logs opencollab-ci
+          exit 1

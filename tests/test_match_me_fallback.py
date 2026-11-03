@@ -75,6 +75,33 @@ async def test_match_me_says_nothing_when_a_language_is_detected(server, no_sear
 
 
 @pytest.mark.asyncio
+async def test_match_me_rejects_organization_logins(server, mock_github, monkeypatch):
+    """Orgs must not be analysed as a person; search must not run."""
+    mock_github({
+        "/users/acme": {"login": "acme", "type": "Organization"},
+        "/users/acme/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+    searches: list[str] = []
+
+    async def tracked_search(endpoint: str, query: str, params: dict[str, Any] | None = None):
+        searches.append(query)
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", tracked_search)
+
+    payload = await _match_me(server, "acme")
+
+    assert payload == {
+        "error": (
+            "'acme' is an organization, not a user. "
+            "Pass a personal GitHub username, or use "
+            "opencollab_find_issues with scope='acme' to search this org."
+        ),
+    }
+    assert searches == [], "organization logins must not trigger an issue search"
+
+
+@pytest.mark.asyncio
 async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search, mock_github):
     mock_github({
         "/users/gopher": {"login": "gopher", "name": "Go Pher"},
@@ -147,3 +174,62 @@ async def test_match_me_counts_owned_repositories_not_disk_size(
         {"name": "Python", "percentage": 16.7},
     ]
     assert calls == {"get": 2, "search": 1}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("public_repos", [40, 100, 250])
+async def test_match_me_discloses_partial_repository_analysis(
+    server, no_search, mock_github, monkeypatch, public_repos
+):
+    returned = min(public_repos, 100)
+    # Forks count towards public_repos and the API page size, even though
+    # language analysis ignores them.
+    repos = [
+        {"language": "Python", "fork": i % 2 == 0, "topics": []}
+        for i in range(returned)
+    ]
+    mock_github({
+        "/users/dev": {"login": "dev", "public_repos": public_repos},
+        "/users/dev/repos": repos,
+    })
+    calls = []
+    original_get = discovery.github_get
+
+    async def counted_get(*args, **kwargs):
+        calls.append(args)
+        return await original_get(*args, **kwargs)
+
+    monkeypatch.setattr(discovery, "github_get", counted_get)
+
+    payload = await _match_me(server, "dev")
+
+    assert len(calls) == 2, "disclosing truncation must not add pagination requests"
+    assert payload["matched_language"] == "Python"
+    if public_repos > returned:
+        assert payload["repos_analyzed"] == returned
+        assert payload["repos_total"] == public_repos
+        assert "100" in payload["note"]
+        assert "most recently pushed" in payload["note"]
+    else:
+        assert "repos_analyzed" not in payload
+        assert "repos_total" not in payload
+        assert "note" not in payload
+
+
+@pytest.mark.asyncio
+async def test_match_me_keeps_both_partial_analysis_and_language_fallback_notes(
+    server, no_search, mock_github
+):
+    mock_github({
+        "/users/dev": {"login": "dev", "public_repos": 250},
+        "/users/dev/repos": [{"fork": True, "language": "Rust"}] * 100,
+    })
+
+    payload = await _match_me(server, "dev")
+
+    assert payload["repos_analyzed"] == 100
+    assert payload["repos_total"] == 250
+    assert payload["language_fallback"] is True
+    assert "most recently pushed" in payload["note"]
+    assert "defaulted to Python" in payload["note"]
+    assert "opencollab_find_issues" in payload["note"]

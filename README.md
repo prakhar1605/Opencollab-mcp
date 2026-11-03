@@ -24,9 +24,7 @@
 
 6 focused tools. Works with Claude Desktop, Cursor, VS Code, or any MCP-compatible client.
 
-
-
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 
 
@@ -167,7 +165,23 @@ Same JSON as above, but in your client's MCP config file (`.cursor/mcp.json` for
 
 
 <details>
+<summary><b>Claude Code</b></summary>
 
+Run this in your terminal (replace `ghp_your_token_here` with the token from Step 1):
+
+```bash
+claude mcp add opencollab -e GITHUB_TOKEN=ghp_your_token_here -- uvx opencollab-mcp
+```
+
+Check it's connected:
+
+```bash
+claude mcp list
+```
+
+Or run `/mcp` inside a Claude Code session.
+
+</details>
 <summary><b>Plain pip (no uv)</b></summary>
 
 
@@ -241,9 +255,33 @@ For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
 
 `GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
+**Using Docker Compose**
 
+Create a `.env` file from the example:
 
+```bash
+cp .env.example .env
+```
 
+Open `.env` and replace the placeholder with your GitHub token. Do not commit `.env`.
+
+Start the service:
+
+```bash
+docker compose up --build -d
+```
+
+Check the service health:
+
+```bash
+curl http://localhost:8000/health
+```
+
+To stop the service:
+
+```bash
+docker compose down
+```
 </details>
 
 
@@ -312,10 +350,14 @@ The AI picks which tools to call based on what you ask.
 
 |---|---|
 
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) or intermediate (`"help wanted", "help-wanted", "intermediate"`) via `difficulty` — all in one call. |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) and intermediate (`"help wanted", "help-wanted", "intermediate"`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
 
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters. |
-
+`opencollab_match_me` scans up to 100 most recently pushed public repositories,
+excluding forks from language analysis. If the scan is incomplete, its response
+includes `repos_analyzed` (the raw number returned, including forks), `repos_total`
+and a `note` explaining the limit. These fields are omitted for a complete scan;
+the separate Python fallback note still appears when no language is detected.
 
 
 
@@ -467,9 +509,7 @@ Input: `{"owner":"octocat","repo":"Hello-World"}`
 | Tool | What it does |
 
 |---|---|
-
-| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged PR? Checks the timeline so you don't waste a weekend. Takes `#123` or a plain `123`, rejects PR numbers, and reports `linked_prs_checked` so you know if the PR check failed. |
-
+| `opencollab_check_issue_availability` | Is the issue still open? Assigned? Already has an open or merged closing PR? Uses GraphQL `closedByPullRequestsReferences` when authenticated (falling back to closing-keyword matching across paginated REST timeline pages), separates plain mentions into `mentioned_in_prs`, and reports `linked_prs_checked`, `linked_prs_source`, and `timeline_truncated` when the timeline cap is reached. |
 | `opencollab_generate_pr_plan` | Bundles the issue body, comments, CONTRIBUTING.md, PR template preview (`null` when unavailable), and repo layout for the AI to plan a fix. Returns an error for pull request numbers. |
 
 
@@ -800,6 +840,8 @@ Issues and PRs are welcome. The codebase is small (\~1000 lines) and intentional
 
 
 
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+
 When reporting bugs or submitting issues, please include the version of `opencollab-mcp` you are running (especially when using `uvx` caches):
 
 
@@ -927,7 +969,5 @@ New to open source? Start with an open [good first issue](https://github.com/pra
 
 
 [MIT](LICENSE) — built by [Prakhar Pandey](https://github.com/prakhar1605), IIT Guwahati.
-
-
 
 If OpenCollab helps you land your first PR, a ⭐ on the repo would mean a lot.
