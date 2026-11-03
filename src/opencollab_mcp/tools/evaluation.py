@@ -50,6 +50,19 @@ from ..constants import (
     IMPACT_MASSIVE_STARS,
     IMPACT_MEDIUM_STARS,
     IMPACT_MODERATE_STARS,
+    VISIBILITY_FORKS_MAX_POINTS,
+    VISIBILITY_FORKS_MIN,
+    VISIBILITY_FORKS_PER_POINT,
+    VISIBILITY_MAX_SCORE,
+    VISIBILITY_OPEN_ISSUES_MIN,
+    VISIBILITY_OPEN_ISSUES_POINTS,
+    VISIBILITY_STARS_MAX_POINTS,
+    VISIBILITY_STARS_MIN,
+    VISIBILITY_STARS_PER_POINT,
+    VISIBILITY_TOPICS_POINTS,
+    VISIBILITY_WATCHERS_MAX_POINTS,
+    VISIBILITY_WATCHERS_MIN,
+    VISIBILITY_WATCHERS_PER_POINT,
 )
 from ..github_client import github_get, handle_github_error
 from ..helpers import days_ago
@@ -250,12 +263,12 @@ def register(mcp: MCPServer) -> None:
             resume_line = f"Open-source contributor to {repo_name} — {description[:80]}"
 
         visibility = min(
-            (min(stars // 500, 40) if stars >= 100 else 0)
-            + (min(forks // 100, 20) if forks >= 50 else 0)
-            + (min(watchers // 50, 20) if watchers >= 50 else 0)
-            + (10 if open_issues >= 10 else 0)
-            + (10 if repo.get("topics") else 0),
-            100,
+            (min(stars // VISIBILITY_STARS_PER_POINT, VISIBILITY_STARS_MAX_POINTS) if stars >= VISIBILITY_STARS_MIN else 0)
+            + (min(forks // VISIBILITY_FORKS_PER_POINT, VISIBILITY_FORKS_MAX_POINTS) if forks >= VISIBILITY_FORKS_MIN else 0)
+            + (min(watchers // VISIBILITY_WATCHERS_PER_POINT, VISIBILITY_WATCHERS_MAX_POINTS) if watchers >= VISIBILITY_WATCHERS_MIN else 0)
+            + (VISIBILITY_OPEN_ISSUES_POINTS if open_issues >= VISIBILITY_OPEN_ISSUES_MIN else 0)
+            + (VISIBILITY_TOPICS_POINTS if repo.get("topics") else 0),
+            VISIBILITY_MAX_SCORE,
         )
 
         result = {
