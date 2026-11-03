@@ -9,7 +9,7 @@ from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
+from ..helpers import blocking_labels_query, days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
 _FIND_ISSUES_SORT_MAPPINGS: dict[str, dict[str, str]] = {
@@ -51,6 +51,7 @@ def register(mcp: MCPServer) -> None:
             # `language:Jupyter` plus a free-text `Notebook`.
             *(f'language:"{language}"' for language in languages),
             label,
+            blocking_labels_query(),
             "state:open",
             "no:assignee",
             # /search/issues returns pull requests too, and a PR carrying the
@@ -178,7 +179,7 @@ def register(mcp: MCPServer) -> None:
         try:
             result = await github_search(
                 "issues",
-                f'language:"{primary_lang}" {label} state:open '
+                f'language:"{primary_lang}" {label} {blocking_labels_query()} state:open '
                 f'is:issue no:assignee created:>{since} is:public archived:false',
                 {"sort": "created", "order": "desc", "per_page": params.limit},
             )
