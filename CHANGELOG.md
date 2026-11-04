@@ -35,6 +35,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - A test that checks all six tools are registered with read-only annotations ([#193](https://github.com/prakhar1605/Opencollab-mcp/pull/193))
 - Contributors section in the README ([#187](https://github.com/prakhar1605/Opencollab-mcp/pull/187)) and an `.editorconfig` ([#188](https://github.com/prakhar1605/Opencollab-mcp/pull/188))
 - `language` accepts up to three comma-separated languages for `opencollab_find_issues`; the response adds a `languages` list ([#165](https://github.com/prakhar1605/Opencollab-mcp/pull/165))
+- The Docker image published on tags is built for both `linux/amd64` and `linux/arm64` ([#272](https://github.com/prakhar1605/Opencollab-mcp/pull/272))
 - A workflow publishes the Docker image to GitHub Container Registry on `v*` tags ([#164](https://github.com/prakhar1605/Opencollab-mcp/pull/164))
 - `opencollab_generate_pr_plan` includes the repository's PR template ([#150](https://github.com/prakhar1605/Opencollab-mcp/pull/150))
 - `check_issue_availability` warns about assigned issues with no activity for 60 days ([#157](https://github.com/prakhar1605/Opencollab-mcp/pull/157))
