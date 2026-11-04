@@ -539,11 +539,18 @@ def register(mcp: MCPServer) -> None:
             comments_raw = await github_get(
                 f"{path}/issues/{issue_num}/comments", comment_params
             )
+            if not isinstance(comments_raw, list):
+                comments_raw = []
+            last_page = comment_params.get("page", 1)
+            if last_page > 1 and len(comments_raw) < comment_page_size:
+                previous_comments = await github_get(
+                    f"{path}/issues/{issue_num}/comments",
+                    {"per_page": comment_page_size, "page": last_page - 1},
+                )
+                if isinstance(previous_comments, list):
+                    comments_raw = (previous_comments + comments_raw)[-comment_page_size:]
         except Exception as e:
             return handle_github_error(e)
-
-        if not isinstance(comments_raw, list):
-            comments_raw = []
 
         comments = [
             {

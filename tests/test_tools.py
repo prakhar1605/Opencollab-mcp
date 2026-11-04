@@ -508,21 +508,22 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
 
 
 @pytest.mark.asyncio
-async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github):
-    """Long threads must surface the newest comments, not only the oldest page."""
+@pytest.mark.parametrize("comments_total", [0, 19, 20, 21, 23, 39, 40, 45])
+async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github, comments_total):
+    """Keep the newest twenty comments even when the last page is short."""
     import httpx
 
-    newest = [
-        {"user": {"login": "maintainer"}, "body": "do X instead", "created_at": "2024-06-01T00:00:00Z"},
-        {"user": {"login": "claimer"}, "body": "already working on this", "created_at": "2024-06-02T00:00:00Z"},
-        {"user": {"login": "reviewer"}, "body": "latest guidance", "created_at": "2024-06-03T00:00:00Z"},
+    all_comments = [
+        {"user": {"login": "maintainer"}, "body": f"comment-{index}"}
+        for index in range(comments_total)
     ]
+    pages_requested = []
 
     def comments_route(request: httpx.Request):
         page = int(request.url.params.get("page") or "1")
         assert int(request.url.params.get("per_page") or "0") == 20
-        assert page == 2  # 23 comments → last page is 2
-        return newest
+        pages_requested.append(page)
+        return all_comments[(page - 1) * 20:page * 20]
 
     mock_github({
         "/repos/o/r/issues/7": {
@@ -531,7 +532,7 @@ async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github):
             "labels": [],
             "state": "open",
             "user": {"login": "reporter"},
-            "comments": 23,
+            "comments": comments_total,
         },
         "/repos/o/r/issues/7/comments": comments_route,
         "/repos/o/r": {"language": "Python", "default_branch": "main"},
@@ -543,11 +544,14 @@ async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github):
         {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
     )
     plan = json.loads(_extract_text(result))
-    bodies = [c["body"] for c in plan["comments"]]
-    assert bodies == ["do X instead", "already working on this", "latest guidance"]
-    assert "old-0" not in bodies
-    assert plan["comments_shown"] == 3
-    assert plan["comments_total"] == 23
+    assert [c["body"] for c in plan["comments"]] == [c["body"] for c in all_comments[-20:]]
+    assert plan["comments_shown"] == min(comments_total, 20)
+    assert plan["comments_total"] == comments_total
+    last_page = max(1, (comments_total + 19) // 20)
+    expected_pages = [last_page]
+    if last_page > 1 and comments_total % 20:
+        expected_pages.append(last_page - 1)
+    assert pages_requested == expected_pages
 
 
 @pytest.mark.asyncio
