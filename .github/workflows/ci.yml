@@ -86,6 +86,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # Keep PR checks native and fast; tags build both architectures.
+          platforms: linux/amd64
           load: true
           tags: opencollab-mcp:ci
           cache-from: type=gha
