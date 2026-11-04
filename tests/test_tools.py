@@ -503,6 +503,51 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
     assert [comment["body"] for comment in plan["comments"]] == [c["body"] for c in humans]
     assert plan["bot_comments_skipped"] == len(bots)
     assert plan["issue"]["comments_count"] == len(humans) + len(bots)
+    assert plan["comments_shown"] == len(humans)
+    assert plan["comments_total"] == len(humans) + len(bots)
+
+
+@pytest.mark.asyncio
+async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github):
+    """Long threads must surface the newest comments, not only the oldest page."""
+    import httpx
+
+    newest = [
+        {"user": {"login": "maintainer"}, "body": "do X instead", "created_at": "2024-06-01T00:00:00Z"},
+        {"user": {"login": "claimer"}, "body": "already working on this", "created_at": "2024-06-02T00:00:00Z"},
+        {"user": {"login": "reviewer"}, "body": "latest guidance", "created_at": "2024-06-03T00:00:00Z"},
+    ]
+
+    def comments_route(request: httpx.Request):
+        page = int(request.url.params.get("page") or "1")
+        assert int(request.url.params.get("per_page") or "0") == 20
+        assert page == 2  # 23 comments → last page is 2
+        return newest
+
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Long thread",
+            "body": "Please read the latest comments",
+            "labels": [],
+            "state": "open",
+            "user": {"login": "reporter"},
+            "comments": 23,
+        },
+        "/repos/o/r/issues/7/comments": comments_route,
+        "/repos/o/r": {"language": "Python", "default_branch": "main"},
+        "/repos/o/r/contents": [],
+    })
+
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    plan = json.loads(_extract_text(result))
+    bodies = [c["body"] for c in plan["comments"]]
+    assert bodies == ["do X instead", "already working on this", "latest guidance"]
+    assert "old-0" not in bodies
+    assert plan["comments_shown"] == 3
+    assert plan["comments_total"] == 23
 
 
 @pytest.mark.asyncio

@@ -510,9 +510,10 @@ def register(mcp: MCPServer) -> None:
                 return []
 
         try:
-            issue, comments_raw, repo_info, contrib_text, dir_listing, template_text = await asyncio.gather(
+            # Fetch the issue first so we can request the *last* comments page
+            # when the thread is longer than one page (GitHub returns oldest first).
+            issue, repo_info, contrib_text, dir_listing, template_text = await asyncio.gather(
                 github_get(f"{path}/issues/{issue_num}"),
-                github_get(f"{path}/issues/{issue_num}/comments", {"per_page": 20}),
                 github_get(path),
                 _try_contributing(),
                 _try_root_dir(),
@@ -527,6 +528,22 @@ def register(mcp: MCPServer) -> None:
             return json.dumps(
                 {"error": f"#{issue_num} is a pull request, not an issue"}, indent=2
             )
+
+        comments_total = int(issue.get("comments") or 0)
+        comment_page_size = 20
+        comment_params: dict = {"per_page": comment_page_size}
+        if comments_total > comment_page_size:
+            comment_params["page"] = (comments_total + comment_page_size - 1) // comment_page_size
+
+        try:
+            comments_raw = await github_get(
+                f"{path}/issues/{issue_num}/comments", comment_params
+            )
+        except Exception as e:
+            return handle_github_error(e)
+
+        if not isinstance(comments_raw, list):
+            comments_raw = []
 
         comments = [
             {
@@ -553,9 +570,11 @@ def register(mcp: MCPServer) -> None:
                 "state": issue.get("state"),
                 "author": login_of(issue),
                 "created_days_ago": days_ago(issue.get("created_at")),
-                "comments_count": issue.get("comments", 0),
+                "comments_count": comments_total,
             },
             "comments": comments,
+            "comments_shown": len(comments),
+            "comments_total": comments_total,
             "bot_comments_skipped": len(comments_raw) - len(comments),
             "contributing_guidelines_preview": truncate(contrib_text, 1000) if contrib_text else "Not found",
             "pr_template_preview": truncate(template_text, 1000) if template_text else None,
