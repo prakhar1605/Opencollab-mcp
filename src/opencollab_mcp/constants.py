@@ -20,6 +20,7 @@ except PackageNotFoundError:
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
 GITHUB_RETRY_DELAY_SECONDS = 1.0
+GITHUB_MAX_REDIRECTS = 5
 GITHUB_DEFAULT_MAX_PAGES = 5
 USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"

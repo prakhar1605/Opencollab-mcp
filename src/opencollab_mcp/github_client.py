@@ -14,7 +14,7 @@ import logging
 import os
 import time
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -25,6 +25,7 @@ from .constants import (
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
     GITHUB_DEFAULT_MAX_PAGES,
+    GITHUB_MAX_REDIRECTS,
     GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
     GITHUB_RETRY_DELAY_SECONDS,
     USER_AGENT,
@@ -156,17 +157,27 @@ async def _request(
     non-JSON bodies return `({}, False, response)` so callers degrade gracefully
     without caching transient placeholders.
     """
-    _validate_api_url(url)
     target = label or url
 
-    for attempt in range(2):
-        req_kwargs: dict[str, Any] = {"headers": _get_headers()}
-        if params is not None:
-            req_kwargs["params"] = params
-        resp = await _get_client().get(url, **req_kwargs)
-        if resp.status_code not in (502, 503, 504) or attempt == 1:
+    for redirects in range(GITHUB_MAX_REDIRECTS + 1):
+        # Validate every hop before building or sending authenticated requests.
+        _validate_api_url(url)
+        for attempt in range(2):
+            req_kwargs: dict[str, Any] = {"headers": _get_headers(), "follow_redirects": False}
+            if params is not None:
+                req_kwargs["params"] = params
+            resp = await _get_client().get(url, **req_kwargs)
+            if resp.status_code not in (502, 503, 504) or attempt == 1:
+                break
+            await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+
+        location = resp.headers.get("Location")
+        if resp.status_code not in (301, 302, 303, 307, 308) or not location:
             break
-        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+        if redirects == GITHUB_MAX_REDIRECTS:
+            raise httpx.TooManyRedirects("Too many GitHub API redirects", request=resp.request)
+        url = urljoin(str(resp.request.url), location)
+        params = None  # The Location URL owns the redirected request's query.
 
     resp.raise_for_status()
     _check_rate_limit(resp)
