@@ -25,6 +25,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `sort` option for `opencollab_find_issues`: `newest` (default), `recently_updated` or `least_discussed` ([#219](https://github.com/prakhar1605/Opencollab-mcp/pull/219))
 - `docker-compose.yml` example and README instructions for the HTTP transport ([#218](https://github.com/prakhar1605/Opencollab-mcp/pull/218))
 - `find_issues` reports `updated_days_ago` (days since last activity, `null` when missing) for each issue ([#217](https://github.com/prakhar1605/Opencollab-mcp/pull/217))
+- `opencollab-mcp --check` verifies the token, scopes and rate limit, then exits ([#277](https://github.com/prakhar1605/Opencollab-mcp/pull/277))
 - `parse_github_url` helper that parses repository, issue and pull request URLs without network calls ([#201](https://github.com/prakhar1605/Opencollab-mcp/pull/201))
 - `.dockerignore` keeps the Docker build context small ([#202](https://github.com/prakhar1605/Opencollab-mcp/pull/202))
 - `py.typed` marker so type checkers use the package's annotations ([#200](https://github.com/prakhar1605/Opencollab-mcp/pull/200))
@@ -71,6 +72,8 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Renamed or transferred repositories work: GET redirects are followed within the GitHub API origin, validated before every authenticated request ([#275](https://github.com/prakhar1605/Opencollab-mcp/pull/275))
+- `generate_pr_plan` reads the newest comments (not only the oldest 20) and reports `comments_shown` / `comments_total` ([#273](https://github.com/prakhar1605/Opencollab-mcp/pull/273))
 - `find_issues` and `match_me` no longer suggest issues carrying a blocking label (`wontfix`, `duplicate`, `invalid`, `blocked`, …), derived from the same list `check_issue_availability` uses ([#271](https://github.com/prakhar1605/Opencollab-mcp/pull/271))
 - `opencollab_match_me` rejects organization logins with a pointer to `find_issues` + `scope` ([#269](https://github.com/prakhar1605/Opencollab-mcp/pull/269))
 - `generate_pr_plan` no longer crashes when GitHub returns `"user": null` for a deleted account; the author shows as `unknown` ([#267](https://github.com/prakhar1605/Opencollab-mcp/pull/267))
