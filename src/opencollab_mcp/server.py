@@ -4,7 +4,8 @@ Slim entry point. All 6 tools live in src/opencollab_mcp/tools/, organized
 by category to match the three sections in the README.
 
 Supports STDIO (local), streamable-HTTP, and legacy SSE (remote) transports.
-Set TRANSPORT and optionally PORT=8000 for remote deployment.
+Set TRANSPORT and optionally PORT=8000 for remote deployment, or pass
+--transport / --port on the command line (flags win over env vars).
 """
 
 from __future__ import annotations
@@ -38,8 +39,14 @@ def _configure_logging() -> None:
         )
 
 
-def _read_port() -> int:
-    raw = os.environ.get("PORT", "8000")
+def _read_port(raw: str | None = None) -> int:
+    """Validate a port value from a --port flag or the PORT env var.
+
+    When raw is None, the PORT env var (default 8000) is used. Exits with
+    the same error whether the bad value came from the flag or the env var.
+    """
+    if raw is None:
+        raw = os.environ.get("PORT", "8000")
     try:
         port = int(raw)
     except ValueError:
@@ -73,6 +80,8 @@ def main(argv: list[str] | None = None) -> None:
         description="OpenCollab MCP Server — AI-powered open source contribution matchmaker.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
+            "command-line flags override the matching environment variables:\n"
+            "  --transport beats TRANSPORT, --port beats PORT.\n"
             "environment variables:\n"
             "  GITHUB_TOKEN         GitHub token (optional; recommended for a higher rate limit)\n"
             "  GH_TOKEN             fallback when GITHUB_TOKEN is unset or empty\n"
@@ -87,10 +96,28 @@ def main(argv: list[str] | None = None) -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    _, unknown_args = parser.parse_known_args(argv)
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "streamable-http", "http", "sse"],
+        type=str.lower,
+        default=None,
+        metavar="{stdio,streamable-http,http,sse}",
+        help="transport to use; overrides TRANSPORT (default: stdio)",
+    )
+    parser.add_argument(
+        "--port",
+        default=None,
+        metavar="N",
+        help="port for HTTP transports; overrides PORT (default: 8000)",
+    )
+    args, unknown_args = parser.parse_known_args(argv)
 
     _configure_logging()
-    transport = os.environ.get("TRANSPORT", "stdio").lower()
+    # Precedence: flag > environment variable > default.
+    if args.transport is not None:
+        transport = args.transport
+    else:
+        transport = os.environ.get("TRANSPORT", "stdio").lower()
     if transport not in ("stdio", "streamable-http", "http", "sse"):
         sys.exit(
             "Error: TRANSPORT must be one of stdio, streamable-http, http, sse; "
@@ -105,12 +132,12 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     if transport in ("streamable-http", "http"):
-        port = _read_port()
+        port = _read_port(args.port)
         logger.info("Starting OpenCollab MCP on streamable-http (port %d)", port)
         mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
     elif transport == "sse":
         # Legacy SSE transport — kept for backwards compatibility.
-        port = _read_port()
+        port = _read_port(args.port)
         logger.info("Starting OpenCollab MCP on SSE (port %d)", port)
         mcp.run(transport="sse", host="0.0.0.0", port=port)
     else:

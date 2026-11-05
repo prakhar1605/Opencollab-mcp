@@ -29,7 +29,7 @@ def test_stdio_is_default(monkeypatch):
     assert calls == [((), {})]
 
 
-@pytest.mark.parametrize("argv", [["--port", "9000"], ["--transport", "sse"]])
+@pytest.mark.parametrize("argv", [["--bogus"], ["--unknown", "value"]])
 def test_unknown_arguments_warn_without_stopping_stdio(monkeypatch, caplog, capsys, argv):
     with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
         calls = _run_main_with(monkeypatch, {}, argv)
@@ -43,6 +43,68 @@ def test_no_unknown_arguments_does_not_warn(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
         _run_main_with(monkeypatch, {}, [])
     assert "Ignoring unknown arguments" not in caplog.text
+
+
+def test_transport_flag_overrides_env(monkeypatch):
+    calls = _run_main_with(
+        monkeypatch, {"TRANSPORT": "stdio"}, ["--transport", "streamable-http"]
+    )
+    assert calls == [
+        ((), {"transport": "streamable-http", "host": "0.0.0.0", "port": 8000})
+    ]
+
+
+def test_port_flag_overrides_env(monkeypatch):
+    calls = _run_main_with(
+        monkeypatch,
+        {"TRANSPORT": "streamable-http", "PORT": "8000"},
+        ["--port", "9000"],
+    )
+    assert calls == [
+        ((), {"transport": "streamable-http", "host": "0.0.0.0", "port": 9000})
+    ]
+
+
+def test_transport_and_port_flags_together(monkeypatch):
+    calls = _run_main_with(
+        monkeypatch,
+        {"TRANSPORT": "stdio", "PORT": "8000"},
+        ["--transport", "sse", "--port", "9000"],
+    )
+    assert calls == [((), {"transport": "sse", "host": "0.0.0.0", "port": 9000})]
+
+
+def test_transport_flag_is_case_insensitive(monkeypatch):
+    calls = _run_main_with(monkeypatch, {}, ["--transport", "SSE"])
+    assert calls == [((), {"transport": "sse", "host": "0.0.0.0", "port": 8000})]
+
+
+@pytest.mark.parametrize("port", ["abc", "8000/tcp", "0", "65536"])
+def test_invalid_port_flag_exits_like_env_port(monkeypatch, capsys, port):
+    with pytest.raises(SystemExit) as excinfo:
+        _run_main_with(
+            monkeypatch,
+            {"TRANSPORT": "streamable-http", "PORT": "8000"},
+            ["--port", port],
+        )
+    assert excinfo.value.code == (
+        f"Error: PORT must be a number between 1 and 65535, got {port!r}"
+    )
+    assert capsys.readouterr().out == ""
+
+
+def test_help_lists_transport_and_port_flags(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **kw: calls.append((a, kw)))
+    with pytest.raises(SystemExit) as exc_info:
+        server.main(["--help"])
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "--transport" in captured.out
+    assert "--port" in captured.out
+    assert "overrides TRANSPORT" in captured.out
+    assert "overrides PORT" in captured.out
+    assert calls == []
 
 
 def test_streamable_http_passes_network_settings_to_run(monkeypatch):
