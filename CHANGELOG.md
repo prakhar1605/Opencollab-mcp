@@ -31,6 +31,7 @@ Changes merged since v0.6.1.
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Retry GitHub REST and GraphQL transport failures once, sharing the existing retry budget for temporary HTTP statuses ([#249](https://github.com/prakhar1605/Opencollab-mcp/issues/249)).
 - Follow renamed/transferred repository GET redirects only within the configured GitHub API origin, with a bounded redirect chain ([#226](https://github.com/prakhar1605/Opencollab-mcp/issues/226)).
 - `find_issues` and `match_me` exclude blocking issue labels and common separator variants using the shared availability policy ([#230](https://github.com/prakhar1605/Opencollab-mcp/issues/230)).
 - Version drift test reads package sources as UTF-8 so it passes on Windows locales that are not UTF-8 by default ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
