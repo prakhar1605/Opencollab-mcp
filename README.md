@@ -269,6 +269,14 @@ Scopes needed: just `public_repo`. OpenCollab never writes anything — it's all
 
 ## Troubleshooting
 
+### Check your setup with `--check`
+
+```bash
+opencollab-mcp --check
+```
+
+This verifies your GitHub token, scopes and rate limit without starting the server, then exits (0 when everything works, 1 otherwise). Run it first when a tool returns an authentication or rate-limit error. It prints which token variable is in use (`GITHUB_TOKEN`, `GH_TOKEN`, or none) but never prints the token itself.
+
 ### Which version am I running?
 
 ```bash

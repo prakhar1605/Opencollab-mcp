@@ -116,6 +116,18 @@ def has_github_token() -> bool:
     return bool(_get_token())
 
 
+def token_source() -> str | None:
+    """Name of the environment variable supplying the token, or None.
+
+    `GITHUB_TOKEN` wins over `GH_TOKEN`, matching `_get_token`.
+    """
+    if os.environ.get("GITHUB_TOKEN", "").strip():
+        return "GITHUB_TOKEN"
+    if os.environ.get("GH_TOKEN", "").strip():
+        return "GH_TOKEN"
+    return None
+
+
 def _get_headers() -> dict[str, str]:
     """Build auth headers from environment."""
     # Strip whitespace: a token from a file or `$(cat token.txt)` often
@@ -222,6 +234,24 @@ async def github_get(
     if use_cache and cacheable:
         _cache_set(key, data)
     return data
+
+
+async def github_get_response(
+    path: str,
+    params: dict[str, Any] | None = None,
+) -> tuple[Any, httpx.Response]:
+    """GET returning `(parsed JSON, response)` without caching.
+
+    For callers that need response headers (for example the
+    `x-oauth-scopes` header on `GET /user`), which `github_get` does not
+    expose.
+    """
+    data, _, resp = await _request(
+        f"{GITHUB_API_BASE}{path}",
+        params=params or {},
+        label=path,
+    )
+    return data, resp
 
 
 async def github_get_all(
