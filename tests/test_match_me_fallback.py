@@ -54,6 +54,7 @@ async def test_match_me_flags_the_python_fallback(server, no_search, mock_github
     payload = await _match_me(server, "nobody")
 
     assert payload["matched_language"] == "Python", label
+    assert payload["matched_languages"] == ["Python"], label
     assert payload["language_fallback"] is True, label
     assert "note" in payload, f"{label}: the fallback is invisible to the assistant"
     assert "defaulted to Python" in payload["note"]
@@ -70,6 +71,7 @@ async def test_match_me_says_nothing_when_a_language_is_detected(server, no_sear
     payload = await _match_me(server, "gopher")
 
     assert payload["matched_language"] == "Go"
+    assert payload["matched_languages"] == ["Go"]
     assert "language_fallback" not in payload, "the flag must not appear on the happy path"
     assert "note" not in payload, "no null key on the happy path"
 
@@ -112,11 +114,30 @@ async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search,
 
     assert set(payload) == {
         "username", "name", "top_languages", "topics",
-        "matched_language", "matched_issues", "difficulty"
+        "matched_language", "matched_languages", "matched_issues", "difficulty"
     }
     assert payload["name"] == "Go Pher"
     assert payload["topics"] == ["cli"]
     assert payload["top_languages"] == [{"name": "Go", "percentage": 100.0}]
+
+
+@pytest.mark.asyncio
+async def test_match_me_returns_all_matched_languages_and_legacy_primary(
+    server, no_search, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            *[{"language": "Go", "topics": []} for _ in range(3)],
+        ],
+    })
+
+    payload = await _match_me(server, "polyglot")
+
+    assert payload["matched_languages"] == ["Python", "Rust", "Go"]
+    assert payload["matched_language"] == "Python"
 
 
 @pytest.mark.asyncio
