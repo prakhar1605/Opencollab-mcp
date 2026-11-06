@@ -25,6 +25,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `sort` option for `opencollab_find_issues`: `newest` (default), `recently_updated` or `least_discussed` ([#219](https://github.com/prakhar1605/Opencollab-mcp/pull/219))
 - `docker-compose.yml` example and README instructions for the HTTP transport ([#218](https://github.com/prakhar1605/Opencollab-mcp/pull/218))
 - `find_issues` reports `updated_days_ago` (days since last activity, `null` when missing) for each issue ([#217](https://github.com/prakhar1605/Opencollab-mcp/pull/217))
+- `opencollab_match_me` searches the user's top language plus up to two more that make up over 20% of their repositories; the response adds `matched_languages` ([#281](https://github.com/prakhar1605/Opencollab-mcp/pull/281))
 - `opencollab-mcp --check` verifies the token, scopes and rate limit, then exits ([#277](https://github.com/prakhar1605/Opencollab-mcp/pull/277))
 - `parse_github_url` helper that parses repository, issue and pull request URLs without network calls ([#201](https://github.com/prakhar1605/Opencollab-mcp/pull/201))
 - `.dockerignore` keeps the Docker build context small ([#202](https://github.com/prakhar1605/Opencollab-mcp/pull/202))
@@ -72,6 +73,8 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Connection errors and timeouts are retried once, like 502/503/504 responses, for both REST and GraphQL ([#279](https://github.com/prakhar1605/Opencollab-mcp/pull/279))
+- The README's VS Code setup uses VS Code's own `mcp.json` format ([#278](https://github.com/prakhar1605/Opencollab-mcp/pull/278))
 - Renamed or transferred repositories work: GET redirects are followed within the GitHub API origin, validated before every authenticated request ([#275](https://github.com/prakhar1605/Opencollab-mcp/pull/275))
 - `generate_pr_plan` reads the newest comments (not only the oldest 20) and reports `comments_shown` / `comments_total` ([#273](https://github.com/prakhar1605/Opencollab-mcp/pull/273))
 - `find_issues` and `match_me` no longer suggest issues carrying a blocking label (`wontfix`, `duplicate`, `invalid`, `blocked`, …), derived from the same list `check_issue_availability` uses ([#271](https://github.com/prakhar1605/Opencollab-mcp/pull/271))
