@@ -7,6 +7,7 @@ handed to github_search and assert on it directly.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -34,6 +35,10 @@ async def _call(server, name: str, arguments: dict):
     if hasattr(result, "__await__"):
         result = await result
     return result
+
+
+def _language_qualifiers(query: str) -> list[str]:
+    return re.findall(r'language:"([^"]+)"', query)
 
 
 @pytest.fixture
@@ -106,7 +111,7 @@ async def test_match_me_queries_three_top_languages_above_threshold(
     await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
 
     assert len(captured_queries) == 1
-    assert parse_query(captured_queries[0])["language"] == ["Python", "Rust", "Go"]
+    assert _language_qualifiers(captured_queries[0]) == ["Python", "Rust", "Go"]
 
 
 @pytest.mark.asyncio
@@ -125,7 +130,7 @@ async def test_match_me_omits_third_language_below_threshold(
     await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
 
     assert len(captured_queries) == 1
-    assert parse_query(captured_queries[0])["language"] == ["Python", "Rust"]
+    assert _language_qualifiers(captured_queries[0]) == ["Python", "Rust"]
 
 
 @pytest.mark.asyncio
@@ -140,7 +145,7 @@ async def test_match_me_single_language_query_is_unchanged(
     await _call(server, "opencollab_match_me", {"params": {"username": "gopher"}})
 
     assert len(captured_queries) == 1
-    assert parse_query(captured_queries[0])["language"] == ["Go"]
+    assert _language_qualifiers(captured_queries[0]) == ["Go"]
 
 
 # ---- is:issue (#11) --------------------------------------------------------
