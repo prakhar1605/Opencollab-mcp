@@ -156,15 +156,34 @@ def register(mcp: MCPServer) -> None:
         # account, a fork-only account, an org-only contributor — would
         # otherwise be served Python issues as though Python had been detected.
         language_detected = bool(top_langs)
-        primary_lang = top_langs[0][0] if language_detected else "Python"
+        language_list = []
+        if language_detected:
+            language_list.append(languages[0]["name"])
+            language_list.extend(
+                language["name"]
+                for language in languages[1:3]
+                if language["percentage"] > 20
+            )
+        else:
+            language_list.append("Python")
+        primary_lang = language_list[0]
         since = recent_date_str(RECENT_ISSUES_DAYS)
         label = difficulty_label(params.difficulty)
-
         try:
+            query = " ".join([
+                *(f'language:"{language}"' for language in language_list),
+                label,
+                "state:open",
+                "is:issue",
+                "no:assignee",
+                f"created:>{since}",
+                "is:public",
+                "archived:false",
+            ])
+
             result = await github_search(
                 "issues",
-                f'language:"{primary_lang}" {label} state:open '
-                f'is:issue no:assignee created:>{since} is:public archived:false',
+                query,
                 {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
@@ -187,6 +206,7 @@ def register(mcp: MCPServer) -> None:
             "top_languages": languages,
             "topics": sorted(topics_set)[:10],
             "matched_language": primary_lang,
+            "matched_languages": language_list,
             "matched_issues": issues,
             "difficulty": params.difficulty,
         }

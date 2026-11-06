@@ -95,6 +95,59 @@ async def test_match_me_quotes_detected_language(server, captured_queries, mock_
     assert 'language:"Jupyter Notebook"' in captured_queries[0]
 
 
+@pytest.mark.asyncio
+async def test_match_me_queries_three_top_languages_above_threshold(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            *[{"language": "Go", "topics": []} for _ in range(3)],
+        ],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
+
+    assert len(captured_queries) == 1
+    assert parse_query(captured_queries[0])["language"] == ["Python", "Rust", "Go"]
+
+
+@pytest.mark.asyncio
+async def test_match_me_omits_third_language_below_threshold(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            {"language": "Go", "topics": []},
+        ],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
+
+    assert len(captured_queries) == 1
+    assert parse_query(captured_queries[0])["language"] == ["Python", "Rust"]
+
+
+@pytest.mark.asyncio
+async def test_match_me_single_language_query_is_unchanged(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher"}})
+
+    assert len(captured_queries) == 1
+    assert parse_query(captured_queries[0])["language"] == ["Go"]
+
+
 # ---- is:issue (#11) --------------------------------------------------------
 
 @pytest.mark.asyncio
