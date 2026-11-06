@@ -23,6 +23,7 @@ from starlette.responses import PlainTextResponse
 
 from . import github_client
 from .constants import __version__
+from .github_client import has_github_token
 from .tools import discovery, evaluation, issues
 
 
@@ -180,6 +181,11 @@ def main(argv: list[str] | None = None) -> None:
 
     _configure_logging()
     logger = logging.getLogger("opencollab_mcp")
+    if not has_github_token():
+        logger.warning(
+            "No GITHUB_TOKEN or GH_TOKEN set — running unauthenticated "
+            "(60 requests/hour, 10 searches/minute). See the README to add a token."
+        )
     if unknown_args:
         logger.warning(
             "Ignoring unknown arguments: %s. Configure the server with environment "
