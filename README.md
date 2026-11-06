@@ -75,9 +75,41 @@ Restart Claude Desktop. You're done.
 </details>
 
 <details>
-<summary><b>Cursor / VS Code</b></summary>
+<summary><b>Cursor</b></summary>
 
-Same JSON as above, but in your client's MCP config file (`.cursor/mcp.json` for Cursor).
+Use the same JSON as above in your Cursor MCP config file (`.cursor/mcp.json`).
+
+</details>
+
+<details>
+<summary><b>VS Code</b></summary>
+
+Create or open `.vscode/mcp.json` in your workspace and add:
+
+```json
+{
+  "servers": {
+    "opencollab": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["opencollab-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "${input:github-token}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "github-token",
+      "description": "GitHub Personal Access Token",
+      "password": true
+    }
+  ]
+}
+```
+
+When prompted by VS Code, enter your GitHub token.
 
 </details>
 
