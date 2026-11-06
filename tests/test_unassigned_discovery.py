@@ -2,8 +2,13 @@
 
 import pytest
 
+from opencollab_mcp.constants import (
+    BEGINNER_SEARCH_LABELS,
+    INTERMEDIATE_SEARCH_LABELS,
+)
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+from tests.query_utils import parse_query
 
 
 @pytest.mark.asyncio
@@ -32,5 +37,10 @@ async def test_discovery_excludes_assigned_issues(monkeypatch, mock_github, diff
     assert "no:assignee" in query.split()
     assert "is:issue" in query.split()
     assert 'language:"Jupyter Notebook"' in query
-    label = "good first issue" if difficulty == "beginner" else "help wanted"
-    assert f'label:"{label}"' in query
+    labels = parse_query(query)["label"]
+    expected_labels = (
+        BEGINNER_SEARCH_LABELS
+        if difficulty == "beginner"
+        else INTERMEDIATE_SEARCH_LABELS
+    )
+    assert all(label in labels for label in expected_labels)

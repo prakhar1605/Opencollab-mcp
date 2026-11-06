@@ -20,6 +20,7 @@ except PackageNotFoundError:
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
 GITHUB_RETRY_DELAY_SECONDS = 1.0
+GITHUB_MAX_REDIRECTS = 5
 GITHUB_DEFAULT_MAX_PAGES = 5
 USER_AGENT = f"opencollab-mcp/{__version__}"
 GITHUB_API_VERSION = "2022-11-28"
@@ -44,6 +45,17 @@ WARNING_ISSUE_LABELS = frozenset({
     "needs discussion",
     "on hold",
 })
+BEGINNER_SEARCH_LABELS = (
+    "good first issue",
+    "good-first-issue",
+    "beginner",
+    "first-timers-only"
+)
+INTERMEDIATE_SEARCH_LABELS = (
+    "help wanted",
+    "help-wanted",
+    "intermediate"
+)
 
 # ---- PR planning previews ----
 PR_PLAN_ISSUE_BODY_LIMIT = 1500
@@ -108,3 +120,29 @@ IMPACT_MASSIVE_STARS = 50_000
 IMPACT_HIGH_STARS = 10_000
 IMPACT_MEDIUM_STARS = 1_000
 IMPACT_MODERATE_STARS = 100
+
+# ---- impact_estimator visibility score ----
+# Stars contribution: min(stars // PER_POINT, MAX) if stars >= MIN else 0
+VISIBILITY_STARS_PER_POINT = 500
+VISIBILITY_STARS_MAX_POINTS = 40
+VISIBILITY_STARS_MIN = 100
+
+# Forks contribution
+VISIBILITY_FORKS_PER_POINT = 100
+VISIBILITY_FORKS_MAX_POINTS = 20
+VISIBILITY_FORKS_MIN = 50
+
+# Watchers contribution
+VISIBILITY_WATCHERS_PER_POINT = 50
+VISIBILITY_WATCHERS_MAX_POINTS = 20
+VISIBILITY_WATCHERS_MIN = 50
+
+# Open issues bonus
+VISIBILITY_OPEN_ISSUES_MIN = 10
+VISIBILITY_OPEN_ISSUES_POINTS = 10
+
+# Topics bonus
+VISIBILITY_TOPICS_POINTS = 10
+
+# Cap for the combined visibility score
+VISIBILITY_MAX_SCORE = 100

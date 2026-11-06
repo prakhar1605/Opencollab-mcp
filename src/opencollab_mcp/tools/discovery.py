@@ -9,7 +9,7 @@ from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
+from ..helpers import blocking_labels_query, days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
 _FIND_ISSUES_SORT_MAPPINGS: dict[str, dict[str, str]] = {
@@ -31,8 +31,8 @@ def register(mcp: MCPServer) -> None:
     )
     async def opencollab_find_issues(params: LanguageInput) -> str:
         """Find unassigned open-source issues by language and difficulty.
-        Beginner searches use the "good first issue" label, while intermediate
-        searches use the "help wanted" label. Returns up to `limit` (default 15,
+        Beginner searches use the "good first issue", "good-first-issue", "beginner", and "first-timers-only" labels, while intermediate
+        searches use the "help wanted", "help-wanted", "intermediate" labels. Returns up to `limit` (default 15,
         max 30) issues from non-archived public repos created within `max_age_days`
         (default 90, range 1-365). Increase it to find older open issues.
         exclude_repos optionally omits up to 10 repositories in owner/name format.
@@ -51,6 +51,7 @@ def register(mcp: MCPServer) -> None:
             # `language:Jupyter` plus a free-text `Notebook`.
             *(f'language:"{language}"' for language in languages),
             label,
+            blocking_labels_query(),
             "state:open",
             "no:assignee",
             # /search/issues returns pull requests too, and a PR carrying the
@@ -131,6 +132,21 @@ def register(mcp: MCPServer) -> None:
             )
         except Exception as e:
             return handle_github_error(e)
+
+        # Orgs share the /users/{login} endpoint; matching their repos as a
+        # person's "skills" misleads the assistant into "based on your skills…".
+        if user.get("type") == "Organization":
+            return json.dumps(
+                {
+                    "error": (
+                        f"'{params.username}' is an organization, not a user. "
+                        "Pass a personal GitHub username, or use "
+                        f"opencollab_find_issues with scope='{params.username}' "
+                        "to search this org."
+                    ),
+                },
+                indent=2,
+            )
 
         lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()

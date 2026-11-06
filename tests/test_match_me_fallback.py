@@ -77,6 +77,33 @@ async def test_match_me_says_nothing_when_a_language_is_detected(server, no_sear
 
 
 @pytest.mark.asyncio
+async def test_match_me_rejects_organization_logins(server, mock_github, monkeypatch):
+    """Orgs must not be analysed as a person; search must not run."""
+    mock_github({
+        "/users/acme": {"login": "acme", "type": "Organization"},
+        "/users/acme/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+    searches: list[str] = []
+
+    async def tracked_search(endpoint: str, query: str, params: dict[str, Any] | None = None):
+        searches.append(query)
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", tracked_search)
+
+    payload = await _match_me(server, "acme")
+
+    assert payload == {
+        "error": (
+            "'acme' is an organization, not a user. "
+            "Pass a personal GitHub username, or use "
+            "opencollab_find_issues with scope='acme' to search this org."
+        ),
+    }
+    assert searches == [], "organization logins must not trigger an issue search"
+
+
+@pytest.mark.asyncio
 async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search, mock_github):
     mock_github({
         "/users/gopher": {"login": "gopher", "name": "Go Pher"},
