@@ -189,6 +189,7 @@ def register(mcp: MCPServer) -> None:
             query = " ".join([
                 *(f'language:"{language}"' for language in language_list),
                 label,
+                blocking_labels_query(),
                 "state:open",
                 "is:issue",
                 "no:assignee",
