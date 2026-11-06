@@ -199,8 +199,12 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top languages, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`good first issue`) or intermediate (`help wanted`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`good first issue`) and intermediate (`help wanted`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top languages, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) or intermediate (`"help wanted", "help-wanted", "intermediate"`) via `difficulty` — all in one call. |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) and intermediate (`"help wanted", "help-wanted", "intermediate"`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+
+Both discovery tools exclude issues labelled `wontfix`, `won't fix`, `duplicate`,
+or `invalid`, including common hyphen/underscore variants. Custom label names
+may still require checking with `opencollab_check_issue_availability`.
 
 `opencollab_match_me` scans up to 100 most recently pushed public repositories,
 excluding forks from language analysis. If the scan is incomplete, its response
@@ -264,6 +268,14 @@ Scopes needed: just `public_repo`. OpenCollab never writes anything — it's all
 ---
 
 ## Troubleshooting
+
+### Check your setup with `--check`
+
+```bash
+opencollab-mcp --check
+```
+
+This verifies your GitHub token, scopes and rate limit without starting the server, then exits (0 when everything works, 1 otherwise). Run it first when a tool returns an authentication or rate-limit error. It prints which token variable is in use (`GITHUB_TOKEN`, `GH_TOKEN`, or none) but never prints the token itself.
 
 ### Which version am I running?
 

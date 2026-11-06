@@ -12,9 +12,17 @@ from typing import Any
 
 import pytest
 
+from opencollab_mcp import helpers
+from opencollab_mcp.constants import (
+    BEGINNER_SEARCH_LABELS,
+    BLOCKING_ISSUE_LABELS,
+    INTERMEDIATE_SEARCH_LABELS,
+    WARNING_ISSUE_LABELS,
+)
 from opencollab_mcp.helpers import recent_date_str
 from opencollab_mcp.server import build_server
 from opencollab_mcp.tools import discovery
+from tests.query_utils import parse_query
 
 
 @pytest.fixture
@@ -176,7 +184,8 @@ async def test_find_issues_keeps_its_other_qualifiers(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert "created:>" in query
@@ -191,8 +200,9 @@ async def test_find_issues_intermediate_keeps_quoting_and_is_issue(server, captu
     )
 
     query = captured_queries[0]
+    query_dict = parse_query(query)
     assert 'language:"Jupyter Notebook"' in query
-    assert 'label:"help wanted"' in query
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -210,8 +220,9 @@ async def test_match_me_intermediate_sends_help_wanted(server, captured_queries,
     )
 
     query = captured_queries[0]
-    assert 'label:"help wanted"' in query
-    assert 'label:"good first issue"' not in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in INTERMEDIATE_SEARCH_LABELS)
+    assert not any(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "is:issue" in query.split()
 
 
@@ -225,7 +236,8 @@ async def test_match_me_keeps_its_other_qualifiers(server, captured_queries, moc
     await _call(server, "opencollab_match_me", {"params": {"username": "rustacean"}})
 
     query = captured_queries[0]
-    assert 'label:"good first issue"' in query
+    query_dict = parse_query(query)
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in query.split()
     assert "is:public" in query.split()
     assert f"created:>{recent_date_str(90)}" in query
@@ -363,15 +375,23 @@ async def test_find_issues_no_scope_unchanged(server, captured_queries):
     await _call(server, "opencollab_find_issues", {"params": {"language": "Python"}})
 
     query = captured_queries[0]
+    query_dict = parse_query(query)
     tokens = query.split()
     assert not any(t.startswith("org:") or t.startswith("repo:") for t in tokens)
     assert 'language:"Python"' in query
-    assert 'label:"good first issue"' in query
+    assert all(label in query_dict['label'] for label in BEGINNER_SEARCH_LABELS)
     assert "state:open" in tokens
     assert "no:assignee" in tokens
     assert "is:issue" in tokens
     assert "is:public" in tokens
     assert "archived:false" in tokens
+
+@pytest.mark.asyncio
+async def test_find_issues_beginner_label_string_is_exact(server, captured_queries):
+    await _call(server, "opencollab_find_issues", {"params": {"language": "Rust"}})
+
+    expected_label = 'label:"good first issue","good-first-issue","beginner","first-timers-only"'
+    assert expected_label in captured_queries[0]
 
 @pytest.mark.asyncio
 async def test_find_issues_excludes_requested_repositories(server, captured_queries):
@@ -392,3 +412,73 @@ async def test_empty_repository_exclusions_preserve_query(server, captured_queri
     }})
     assert len(captured_queries) == 2
     assert captured_queries[0] == captured_queries[1]
+
+
+# ---- blocking labels (#230) -----------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool", ["opencollab_find_issues", "opencollab_match_me"])
+@pytest.mark.parametrize("difficulty", ["beginner", "intermediate"])
+async def test_discovery_excludes_blocking_labels(
+    server, captured_queries, mock_github, tool, difficulty
+):
+    mock_github({
+        "/users/contributor": {"login": "contributor"},
+        "/users/contributor/repos": [{"language": "Python", "fork": False}],
+    })
+    params = {"language": "Python"} if tool == "opencollab_find_issues" else {
+        "username": "contributor",
+    }
+    await _call(server, tool, {"params": {**params, "difficulty": difficulty}})
+
+    assert len(captured_queries) == 1
+    query = captured_queries[0]
+    parsed = parse_query(query)
+    excluded = set(parsed.get("-label", []))
+    assert BLOCKING_ISSUE_LABELS <= excluded
+    assert {"wont-fix", "wont_fix", "won't-fix", "won't_fix"} <= excluded
+    assert not WARNING_ISSUE_LABELS & excluded
+    # Keep spaces and apostrophes inside one qualifier, not free-text terms.
+    assert '-label:"won\'t fix"' in query
+    labels = BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS
+    assert set(parsed["label"]) == set(labels)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool", ["opencollab_find_issues", "opencollab_match_me"])
+async def test_discovery_uses_shared_blocking_policy(
+    server, captured_queries, mock_github, monkeypatch, tool
+):
+    monkeypatch.setattr(helpers, "BLOCKING_ISSUE_LABELS", frozenset({"not planned"}))
+    mock_github({
+        "/users/contributor": {"login": "contributor"},
+        "/users/contributor/repos": [],
+    })
+    params = {"language": "Python"} if tool == "opencollab_find_issues" else {
+        "username": "contributor",
+    }
+    await _call(server, tool, {"params": params})
+
+    assert len(captured_queries) == 1
+    assert set(parse_query(captured_queries[0]).get("-label", [])) == {
+        "not planned", "not-planned", "not_planned",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["example-org", "example-org/project"])
+async def test_blocking_labels_compose_with_all_discovery_filters(server, captured_queries, scope):
+    repos = [f"example-org/project-{index}" for index in range(10)]
+    await _call(server, "opencollab_find_issues", {"params": {
+        "language": "Jupyter Notebook, Common Lisp, TypeScript",
+        "exclude_repos": repos,
+        "scope": scope,
+    }})
+
+    assert len(captured_queries) == 1
+    parsed = parse_query(captured_queries[0])
+    assert parsed["language"] == ["Jupyter Notebook", "Common Lisp", "TypeScript"]
+    assert parsed["-repo"] == repos
+    assert parsed["repo" if "/" in scope else "org"] == [scope]
+    assert set(parsed["label"]) == set(BEGINNER_SEARCH_LABELS)
+    assert BLOCKING_ISSUE_LABELS <= set(parsed["-label"])

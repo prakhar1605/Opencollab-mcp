@@ -10,14 +10,18 @@ Set TRANSPORT and optionally PORT=8000 for remote deployment.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 import sys
+from datetime import datetime, timezone
+from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from . import github_client
 from .constants import __version__
 from .tools import discovery, evaluation, issues
 
@@ -67,6 +71,83 @@ def build_server() -> MCPServer:
 mcp = build_server()
 
 
+def _format_reset(reset: Any) -> str:
+    """Human-readable UTC time for a rate-limit reset epoch, or "unknown"."""
+    try:
+        reset_at = int(reset)
+    except (TypeError, ValueError):
+        return "unknown"
+    return datetime.fromtimestamp(reset_at, tz=timezone.utc).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
+
+
+async def run_check() -> int:
+    """Verify the token, scopes and rate limit; print results; return exit code.
+
+    Prints which token variable is in use, the authenticated login and
+    scopes from `GET /user`, and the remaining quota and reset time for the
+    core, search and graphql buckets from `GET /rate_limit`. Returns 0 when
+    everything works, 1 otherwise. The token value is never printed.
+    """
+    source = github_client.token_source()
+    if source:
+        print(f"Token: {source} is set")
+    else:
+        print("Token: no GITHUB_TOKEN or GH_TOKEN set (unauthenticated)")
+
+    if source:
+        try:
+            user, user_resp = await github_client.github_get_response("/user")
+        except Exception as exc:
+            print(github_client.handle_github_error(exc))
+            return 1
+        login = user.get("login") if isinstance(user, dict) else None
+        if login:
+            print(f"Authenticated as: {login}")
+        else:
+            print("Authenticated, but GitHub did not return a login")
+        scopes = user_resp.headers.get("x-oauth-scopes", "")
+        if scopes:
+            print(f"Scopes: {scopes}")
+        else:
+            print("Scopes: not reported (fine-grained token or no scopes header)")
+
+    try:
+        limits = await github_client.github_get("/rate_limit", use_cache=False)
+    except Exception as exc:
+        print(github_client.handle_github_error(exc))
+        return 1
+
+    resources = limits.get("resources", {}) if isinstance(limits, dict) else {}
+    if not isinstance(resources, dict):
+        resources = {}
+    for name in ("core", "search", "graphql"):
+        bucket = resources.get(name, {})
+        if not isinstance(bucket, dict):
+            bucket = {}
+        print(
+            f"Rate limit {name}: {bucket.get('remaining', '?')} remaining,"
+            f" resets at {_format_reset(bucket.get('reset'))}"
+        )
+
+    core = resources.get("core", {})
+    if isinstance(core, dict) and core.get("remaining") == 0:
+        print(
+            "Rate limit exhausted for core requests. Wait until the reset time"
+            " above, or use a token with remaining quota."
+        )
+        return 1
+    if not source:
+        print(
+            "No token set: add GITHUB_TOKEN to raise the limit from 60 to"
+            " 5,000 requests/hour. See the README."
+        )
+        return 1
+    print("Check passed: token, scopes and rate limit look good.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="opencollab-mcp",
@@ -87,21 +168,33 @@ def main(argv: list[str] | None = None) -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    _, unknown_args = parser.parse_known_args(argv)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "verify the GitHub token, scopes and rate limit, "
+            "then exit without starting the server"
+        ),
+    )
+    args, unknown_args = parser.parse_known_args(argv)
 
     _configure_logging()
-    transport = os.environ.get("TRANSPORT", "stdio").lower()
-    if transport not in ("stdio", "streamable-http", "http", "sse"):
-        sys.exit(
-            "Error: TRANSPORT must be one of stdio, streamable-http, http, sse; "
-            f"got {transport!r}"
-        )
     logger = logging.getLogger("opencollab_mcp")
     if unknown_args:
         logger.warning(
             "Ignoring unknown arguments: %s. Configure the server with environment "
             "variables (TRANSPORT, PORT); see the README.",
             " ".join(unknown_args),
+        )
+
+    if args.check:
+        sys.exit(asyncio.run(run_check()))
+
+    transport = os.environ.get("TRANSPORT", "stdio").lower()
+    if transport not in ("stdio", "streamable-http", "http", "sse"):
+        sys.exit(
+            "Error: TRANSPORT must be one of stdio, streamable-http, http, sse; "
+            f"got {transport!r}"
         )
 
     if transport in ("streamable-http", "http"):

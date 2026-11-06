@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Changes merged since v0.6.1.
 
 ### Added
+- `--check` flag: verifies the GitHub token, scopes and rate limit, then exits (0 when everything works, 1 otherwise) instead of starting the server ([#256](https://github.com/prakhar1605/Opencollab-mcp/issues/256)).
+- Tagged Docker images now include `linux/amd64` and `linux/arm64`; pull-request Docker checks retain a single-platform build ([#263](https://github.com/prakhar1605/Opencollab-mcp/issues/263)).
 - Optional `exclude_repos` filter for `find_issues`, with up to 10 validated `owner/name` entries ([#175](https://github.com/prakhar1605/Opencollab-mcp/issues/175)).
 - Optional `sort` parameter for `find_issues` (`newest` [default], `recently_updated`, `least_discussed`) mapped to GitHub search sorting ([#177](https://github.com/prakhar1605/Opencollab-mcp/issues/177)).
 - `find_issues` reports nullable `updated_days_ago` using the existing timestamp helper.
@@ -30,6 +32,8 @@ Changes merged since v0.6.1.
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 
 ### Fixed
+- Follow renamed/transferred repository GET redirects only within the configured GitHub API origin, with a bounded redirect chain ([#226](https://github.com/prakhar1605/Opencollab-mcp/issues/226)).
+- `find_issues` and `match_me` exclude blocking issue labels and common separator variants using the shared availability policy ([#230](https://github.com/prakhar1605/Opencollab-mcp/issues/230)).
 - Version drift test reads package sources as UTF-8 so it passes on Windows locales that are not UTF-8 by default ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
 - `opencollab_match_me` now reports a partial repository scan with `repos_analyzed`, `repos_total` and a note when the profile has more repositories than the returned page ([#180](https://github.com/prakhar1605/Opencollab-mcp/issues/180))
 - `opencollab_check_issue_availability` now paginates issue timelines via shared `github_get_all` `Link: rel="next"` pagination (up to 5 pages / 500 events) instead of truncating silently at 100 events, reporting `timeline_truncated: true` and softening `reason` when the cap is hit ([#203](https://github.com/prakhar1605/Opencollab-mcp/issues/203))
