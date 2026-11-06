@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -157,6 +158,23 @@ def _validate_api_url(url: str) -> None:
         )
 
 
+async def _request_with_retry(
+    request: Callable[..., Awaitable[httpx.Response]],
+    url: str,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Share one retry between temporary HTTP statuses and transport failures."""
+    try:
+        response = await request(url, **kwargs)
+    except httpx.TransportError:
+        pass
+    else:
+        if response.status_code not in (502, 503, 504):
+            return response
+    await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+    return await request(url, **kwargs)
+
+
 async def _request(
     url: str,
     params: dict[str, Any] | None = None,
@@ -174,14 +192,10 @@ async def _request(
     for redirects in range(GITHUB_MAX_REDIRECTS + 1):
         # Validate every hop before building or sending authenticated requests.
         _validate_api_url(url)
-        for attempt in range(2):
-            req_kwargs: dict[str, Any] = {"headers": _get_headers(), "follow_redirects": False}
-            if params is not None:
-                req_kwargs["params"] = params
-            resp = await _get_client().get(url, **req_kwargs)
-            if resp.status_code not in (502, 503, 504) or attempt == 1:
-                break
-            await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+        req_kwargs: dict[str, Any] = {"headers": _get_headers(), "follow_redirects": False}
+        if params is not None:
+            req_kwargs["params"] = params
+        resp = await _request_with_retry(_get_client().get, url, **req_kwargs)
 
         location = resp.headers.get("Location")
         if resp.status_code not in (301, 302, 303, 307, 308) or not location:
@@ -345,15 +359,12 @@ async def github_graphql(
     them through `handle_github_error`.
     """
     body: dict[str, Any] = {"query": query, "variables": variables or {}}
-    for attempt in range(2):
-        resp = await _get_client().post(
-            f"{GITHUB_API_BASE}/graphql",
-            headers=_get_headers(),
-            json=body,
-        )
-        if resp.status_code not in (502, 503, 504) or attempt == 1:
-            break
-        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+    resp = await _request_with_retry(
+        _get_client().post,
+        f"{GITHUB_API_BASE}/graphql",
+        headers=_get_headers(),
+        json=body,
+    )
 
     resp.raise_for_status()
     _check_rate_limit(resp)
