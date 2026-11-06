@@ -56,6 +56,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `/health` endpoint, plus cache TTL and eviction tests ([#44](https://github.com/prakhar1605/Opencollab-mcp/pull/44))
 - Difficulty option for `opencollab_match_me`, matching `find_issues` ([#39](https://github.com/prakhar1605/Opencollab-mcp/pull/39))
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
+- Matched_Languages option for`opencollab_match_me`, matching `find_issues` (languages) (Issue [#179])
 
 ### Changed
 - `impact_estimator` visibility-score thresholds moved to named constants in `constants.py`, behaviour unchanged ([#270](https://github.com/prakhar1605/Opencollab-mcp/pull/270))

@@ -75,9 +75,41 @@ Restart Claude Desktop. You're done.
 </details>
 
 <details>
-<summary><b>Cursor / VS Code</b></summary>
+<summary><b>Cursor</b></summary>
 
-Same JSON as above, but in your client's MCP config file (`.cursor/mcp.json` for Cursor).
+Use the same JSON as above in your Cursor MCP config file (`.cursor/mcp.json`).
+
+</details>
+
+<details>
+<summary><b>VS Code</b></summary>
+
+Create or open `.vscode/mcp.json` in your workspace and add:
+
+```json
+{
+  "servers": {
+    "opencollab": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["opencollab-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "${input:github-token}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "github-token",
+      "description": "GitHub Personal Access Token",
+      "password": true
+    }
+  ]
+}
+```
+
+When prompted by VS Code, enter your GitHub token.
 
 </details>
 
@@ -199,7 +231,7 @@ The AI picks which tools to call based on what you ask.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_match_me` | Reads your GitHub profile, detects your top language, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) or intermediate (`"help wanted", "help-wanted", "intermediate"`) via `difficulty` — all in one call. |
+| `opencollab_match_me` | Reads your GitHub profile, detects your top languages, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) or intermediate (`"help wanted", "help-wanted", "intermediate"`) via `difficulty` — all in one call. |
 | `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) and intermediate (`"help wanted", "help-wanted", "intermediate"`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
 
 Both discovery tools exclude issues labelled `wontfix`, `won't fix`, `duplicate`,

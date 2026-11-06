@@ -7,6 +7,7 @@ handed to github_search and assert on it directly.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -42,6 +43,10 @@ async def _call(server, name: str, arguments: dict):
     if hasattr(result, "__await__"):
         result = await result
     return result
+
+
+def _language_qualifiers(query: str) -> list[str]:
+    return re.findall(r'language:"([^"]+)"', query)
 
 
 @pytest.fixture
@@ -96,6 +101,59 @@ async def test_match_me_quotes_detected_language(server, captured_queries, mock_
 
     assert captured_queries, "the tool did not reach github_search"
     assert 'language:"Jupyter Notebook"' in captured_queries[0]
+
+
+@pytest.mark.asyncio
+async def test_match_me_queries_three_top_languages_above_threshold(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            *[{"language": "Go", "topics": []} for _ in range(3)],
+        ],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
+
+    assert len(captured_queries) == 1
+    assert _language_qualifiers(captured_queries[0]) == ["Python", "Rust", "Go"]
+
+
+@pytest.mark.asyncio
+async def test_match_me_omits_third_language_below_threshold(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            {"language": "Go", "topics": []},
+        ],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "polyglot"}})
+
+    assert len(captured_queries) == 1
+    assert _language_qualifiers(captured_queries[0]) == ["Python", "Rust"]
+
+
+@pytest.mark.asyncio
+async def test_match_me_single_language_query_is_unchanged(
+    server, captured_queries, mock_github
+):
+    mock_github({
+        "/users/gopher": {"login": "gopher"},
+        "/users/gopher/repos": [{"language": "Go", "topics": []}],
+    })
+
+    await _call(server, "opencollab_match_me", {"params": {"username": "gopher"}})
+
+    assert len(captured_queries) == 1
+    assert _language_qualifiers(captured_queries[0]) == ["Go"]
 
 
 # ---- is:issue (#11) --------------------------------------------------------
