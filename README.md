@@ -82,6 +82,123 @@ Use the same JSON as above in your Cursor MCP config file (`.cursor/mcp.json`).
 </details>
 
 <details>
+<summary><b>Windsurf</b></summary>
+
+Add the server to your Windsurf MCP config file (`mcp_config.json`).
+
+The main, Cascade-managed config file is opened via Cascade → MCP → "Open MCP config file":
+
+- **macOS/Linux:** `~/.config/devin/mcp_config.json` (or `$XDG_CONFIG_HOME/devin/mcp_config.json`)
+- **Windows:** `%APPDATA%\devin\mcp_config.json`
+
+Separately, Windsurf can also *discover* servers from an editor discovery file (optional — enable via Settings → `chat.mcp.discovery.enabled` → "Devin configurations"):
+
+- `~/.codeium/windsurf/mcp_config.json` (stable) or `~/.codeium/windsurf-next/mcp_config.json` (Next)
+
+Paste this (replace `your_token_here` with the token from Step 1):
+
+```json
+{
+  "mcpServers": {
+    "opencollab": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2",
+        "opencollab-mcp"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Zed</b></summary>
+
+Add the server under the `context_servers` key in your Zed settings file (Zed uses `context_servers`, not `mcpServers`). Open it via the Command Palette → `zed: open settings file`:
+
+Paste this (replace `your_token_here` with the token from Step 1). Set the token in `env` explicitly — Zed launches servers without a login shell, so shell environment variables are not inherited:
+
+```json
+{
+  "context_servers": {
+    "opencollab": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2",
+        "opencollab-mcp"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cline</b></summary>
+
+Add the server to your Cline MCP settings file (entries go under `mcpServers`):
+
+- **CLI:** `~/.cline/data/settings/cline_mcp_settings.json` (override with the `CLINE_MCP_SETTINGS_PATH` env var)
+- **IDE extension:** Cline panel → MCP Servers icon → Configure tab → "Configure MCP Servers"
+
+Paste this (replace `your_token_here` with the token from Step 1):
+
+```json
+{
+  "mcpServers": {
+    "opencollab": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2",
+        "opencollab-mcp"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Continue</b></summary>
+
+Continue uses a YAML `mcpServers` list. Create a standalone file in `.continue/mcpServers/` (e.g. `.continue/mcpServers/opencollab.yaml`) including the required metadata fields:
+
+```yaml
+name: OpenCollab
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: opencollab
+    command: uvx
+    args:
+      - --with
+      - "mcp<2"
+      - opencollab-mcp
+    env:
+      GITHUB_TOKEN: "your_token_here"
+```
+
+(Or add the `mcpServers` block to your `config.yaml`. Continue also accepts the JSON MCP format used by Claude/Cursor/Cline when placed in `.continue/mcpServers/`.)
+
+</details>
+
+<details>
 <summary><b>VS Code</b></summary>
 
 Create or open `.vscode/mcp.json` in your workspace and add:
