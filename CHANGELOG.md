@@ -21,7 +21,7 @@ Changes merged since v0.6.1.
 - Difficulty option for `opencollab_match_me`, matching `find_issues` ([#39](https://github.com/prakhar1605/Opencollab-mcp/pull/39))
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 - Matched_Languages option for`opencollab_match_me`, matching `find_issues` (languages) (Issue [#179])
-
+- Optional `scope` parameter for `find_issues`, supporting an organization/user (`owner`) or a single repository (`owner/name`) ([#223](https://github.com/prakhar1605/Opencollab-mcp/pull/223)).
 ### Changed
 - CI test job now also runs on `windows-latest` and `macos-latest` (Python 3.12 only); Ubuntu still covers Python 3.10-3.13 ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
 - `opencollab_impact_estimator` now returns MCP structured output (`structuredContent` plus a published `outputSchema`) while keeping the JSON text content; GitHub errors are now returned as tool errors (`isError`) ([#141](https://github.com/prakhar1605/Opencollab-mcp/issues/141))
@@ -30,7 +30,7 @@ Changes merged since v0.6.1.
 - Version is now derived from package metadata instead of being copied ([#23](https://github.com/prakhar1605/Opencollab-mcp/pull/23))
 - `opencollab_match_me` now says so when it falls back to Python ([#25](https://github.com/prakhar1605/Opencollab-mcp/pull/25))
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
-
+- Difficulty searches now support multiple label variants for beginner and intermediate levels ([#225](https://github.com/prakhar1605/Opencollab-mcp/pull/225)).
 ### Fixed
 - Retry GitHub REST and GraphQL transport failures once, sharing the existing retry budget for temporary HTTP statuses ([#249](https://github.com/prakhar1605/Opencollab-mcp/issues/249)).
 - Follow renamed/transferred repository GET redirects only within the configured GitHub API origin, with a bounded redirect chain ([#226](https://github.com/prakhar1605/Opencollab-mcp/issues/226)).
