@@ -495,8 +495,8 @@ def handle_github_error(e: Exception) -> str:
             return "Error: Resource not found on GitHub. Double-check the username or repo name."
         if code == 410:
             return (
-                "Error: This issue is gone — it was deleted, or the repository "
-                "has Issues disabled."
+                "Error: This resource is no longer available. "
+                "It may have been permanently removed or is no longer accessible."
             )
         if code == 422:
             return f"Error: GitHub rejected the request — {_validation_message(e.response)}"
