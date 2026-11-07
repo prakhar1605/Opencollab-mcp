@@ -46,3 +46,4 @@ Changes merged since v0.6.1.
 - Stale availability checks, fork-skewed matching and unvalidated path input ([#36](https://github.com/prakhar1605/Opencollab-mcp/pull/36))
 - A rate-limited 403 is now told apart from a denied one ([#26](https://github.com/prakhar1605/Opencollab-mcp/pull/26))
 - Language is quoted and pull requests are excluded in both search queries ([#22](https://github.com/prakhar1605/Opencollab-mcp/pull/22))
+- `handle_github_error` now explains deleted issues or disabled Issues (HTTP 410) and legally restricted resources (HTTP 451) ([#274](https://github.com/prakhar1605/Opencollab-mcp/pull/274))
