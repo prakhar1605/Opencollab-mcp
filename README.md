@@ -169,6 +169,16 @@ docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
 The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
 For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
+You can also use command-line flags instead of environment variables:
+
+```bash
+opencollab-mcp --transport streamable-http --port 9000
+```
+
+Flags win over the matching env vars (`--transport` beats `TRANSPORT`,
+`--port` beats `PORT`); with no flag, the env var (or the default) still
+applies. In an MCP client config this means you can use `"args":
+["--transport", "streamable-http", "--port", "9000"]` instead of `"env"`.
 `GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
 **Using Docker Compose**
 
