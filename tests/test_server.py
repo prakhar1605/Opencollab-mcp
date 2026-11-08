@@ -126,3 +126,22 @@ def test_help_lists_environment_without_starting_server(monkeypatch, capsys, fla
     assert "synthetic-token-must-not-appear" not in captured.out
     assert captured.err == ""
     assert calls == []
+
+
+def test_missing_github_token_warns_once_at_startup(monkeypatch, caplog):
+    """With no token set, main() logs the unauthenticated warning exactly once."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
+        _run_main_with(monkeypatch, {})
+    assert caplog.text.count("No GITHUB_TOKEN or GH_TOKEN set") == 1
+    assert "60 requests/hour" in caplog.text
+
+
+def test_github_token_set_does_not_warn(monkeypatch, caplog):
+    """With a token set, main() logs no unauthenticated warning."""
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    with caplog.at_level(logging.WARNING, logger="opencollab_mcp"):
+        _run_main_with(monkeypatch, {})
+    assert "No GITHUB_TOKEN or GH_TOKEN set" not in caplog.text
