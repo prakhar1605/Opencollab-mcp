@@ -54,6 +54,7 @@ async def test_match_me_flags_the_python_fallback(server, no_search, mock_github
     payload = await _match_me(server, "nobody")
 
     assert payload["matched_language"] == "Python", label
+    assert payload["matched_languages"] == ["Python"], label
     assert payload["language_fallback"] is True, label
     assert "note" in payload, f"{label}: the fallback is invisible to the assistant"
     assert "defaulted to Python" in payload["note"]
@@ -70,8 +71,36 @@ async def test_match_me_says_nothing_when_a_language_is_detected(server, no_sear
     payload = await _match_me(server, "gopher")
 
     assert payload["matched_language"] == "Go"
+    assert payload["matched_languages"] == ["Go"]
     assert "language_fallback" not in payload, "the flag must not appear on the happy path"
     assert "note" not in payload, "no null key on the happy path"
+
+
+@pytest.mark.asyncio
+async def test_match_me_rejects_organization_logins(server, mock_github, monkeypatch):
+    """Orgs must not be analysed as a person; search must not run."""
+    mock_github({
+        "/users/acme": {"login": "acme", "type": "Organization"},
+        "/users/acme/repos": [{"language": "Go", "size": 500, "topics": []}],
+    })
+    searches: list[str] = []
+
+    async def tracked_search(endpoint: str, query: str, params: dict[str, Any] | None = None):
+        searches.append(query)
+        return {"total_count": 0, "items": []}
+
+    monkeypatch.setattr(discovery, "github_search", tracked_search)
+
+    payload = await _match_me(server, "acme")
+
+    assert payload == {
+        "error": (
+            "'acme' is an organization, not a user. "
+            "Pass a personal GitHub username, or use "
+            "opencollab_find_issues with scope='acme' to search this org."
+        ),
+    }
+    assert searches == [], "organization logins must not trigger an issue search"
 
 
 @pytest.mark.asyncio
@@ -85,11 +114,30 @@ async def test_match_me_response_shape_is_otherwise_unchanged(server, no_search,
 
     assert set(payload) == {
         "username", "name", "top_languages", "topics",
-        "matched_language", "matched_issues", "difficulty"
+        "matched_language", "matched_languages", "matched_issues", "difficulty"
     }
     assert payload["name"] == "Go Pher"
     assert payload["topics"] == ["cli"]
     assert payload["top_languages"] == [{"name": "Go", "percentage": 100.0}]
+
+
+@pytest.mark.asyncio
+async def test_match_me_returns_all_matched_languages_and_legacy_primary(
+    server, no_search, mock_github
+):
+    mock_github({
+        "/users/polyglot": {"login": "polyglot"},
+        "/users/polyglot/repos": [
+            *[{"language": "Python", "topics": []} for _ in range(5)],
+            *[{"language": "Rust", "topics": []} for _ in range(3)],
+            *[{"language": "Go", "topics": []} for _ in range(3)],
+        ],
+    })
+
+    payload = await _match_me(server, "polyglot")
+
+    assert payload["matched_languages"] == ["Python", "Rust", "Go"]
+    assert payload["matched_language"] == "Python"
 
 
 @pytest.mark.asyncio

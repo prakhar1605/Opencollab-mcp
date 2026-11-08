@@ -8,13 +8,28 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
-from .constants import BEGINNER_SEARCH_LABELS, INTERMEDIATE_SEARCH_LABELS
+from .constants import BEGINNER_SEARCH_LABELS, BLOCKING_ISSUE_LABELS, INTERMEDIATE_SEARCH_LABELS
 
 
 def difficulty_label(difficulty: str) -> str:
     labels = BEGINNER_SEARCH_LABELS if difficulty == "beginner" else INTERMEDIATE_SEARCH_LABELS
     result = ",".join(f'"{label}"' for label in labels)
     return f"label:{result}"
+
+
+def blocking_labels_query() -> str:
+    # Availability normalizes spaces, hyphens and underscores; search needs
+    # explicit spellings. Keep these common variants short rather than trying
+    # to enumerate every repository's possible custom label names.
+    labels = {
+        label.replace(" ", separator)
+        for label in BLOCKING_ISSUE_LABELS
+        for separator in (" ", "-", "_")
+    }
+    if "wontfix" in BLOCKING_ISSUE_LABELS:
+        labels.update({"wont-fix", "wont_fix"})
+    # Separate negative qualifiers exclude any blocking label without ORs.
+    return " ".join(f'-label:"{label}"' for label in sorted(labels))
 
 
 def days_ago(iso_str: str | None) -> int | None:
@@ -91,6 +106,33 @@ def decode_base64_content(content_obj: dict) -> str:
     if content_obj.get("encoding") != "base64":
         return ""
     return _base64.b64decode(content_obj.get("content", "")).decode("utf-8", errors="replace")
+
+
+def github_user(obj: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the nested `user` object, or `{}` when it is missing or null.
+
+    GitHub's REST schema marks issue/comment `user` as nullable. `.get("user", {})`
+    only helps when the key is absent; a present `null` still yields `None`.
+    """
+    if not isinstance(obj, dict):
+        return {}
+    user = obj.get("user")
+    return user if isinstance(user, dict) else {}
+
+
+def login_of(obj: dict[str, Any] | None, default: str = "unknown") -> str:
+    """Login from a GitHub object that may have a null `user`."""
+    login = github_user(obj).get("login")
+    return login if isinstance(login, str) and login else default
+
+
+def is_bot_user(obj: dict[str, Any] | None) -> bool:
+    """True when the object's user is a Bot or a `[bot]` login."""
+    user = github_user(obj)
+    if user.get("type") == "Bot":
+        return True
+    login = user.get("login") or ""
+    return isinstance(login, str) and login.endswith("[bot]")
 
 
 # HTML comments and code spans/blocks inside PR descriptions do not create

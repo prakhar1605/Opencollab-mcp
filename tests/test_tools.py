@@ -503,9 +503,86 @@ async def test_generate_pr_plan_skips_bot_comments(mock_github, include_bots):
     assert [comment["body"] for comment in plan["comments"]] == [c["body"] for c in humans]
     assert plan["bot_comments_skipped"] == len(bots)
     assert plan["issue"]["comments_count"] == len(humans) + len(bots)
+    assert plan["comments_shown"] == len(humans)
+    assert plan["comments_total"] == len(humans) + len(bots)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("comments_total", [0, 19, 20, 21, 23, 39, 40, 45])
+async def test_generate_pr_plan_fetches_most_recent_comments_page(mock_github, comments_total):
+    """Keep the newest twenty comments even when the last page is short."""
+    import httpx
+
+    all_comments = [
+        {"user": {"login": "maintainer"}, "body": f"comment-{index}"}
+        for index in range(comments_total)
+    ]
+    pages_requested = []
+
+    def comments_route(request: httpx.Request):
+        page = int(request.url.params.get("page") or "1")
+        assert int(request.url.params.get("per_page") or "0") == 20
+        pages_requested.append(page)
+        return all_comments[(page - 1) * 20:page * 20]
+
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Long thread",
+            "body": "Please read the latest comments",
+            "labels": [],
+            "state": "open",
+            "user": {"login": "reporter"},
+            "comments": comments_total,
+        },
+        "/repos/o/r/issues/7/comments": comments_route,
+        "/repos/o/r": {"language": "Python", "default_branch": "main"},
+        "/repos/o/r/contents": [],
+    })
+
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    plan = json.loads(_extract_text(result))
+    assert [c["body"] for c in plan["comments"]] == [c["body"] for c in all_comments[-20:]]
+    assert plan["comments_shown"] == min(comments_total, 20)
+    assert plan["comments_total"] == comments_total
+    last_page = max(1, (comments_total + 19) // 20)
+    expected_pages = [last_page]
+    if last_page > 1 and comments_total % 20:
+        expected_pages.append(last_page - 1)
+    assert pages_requested == expected_pages
+
+
+@pytest.mark.asyncio
+async def test_generate_pr_plan_null_user(mock_github):
+    """GitHub may return `"user": null`; that must not raise AttributeError."""
+    mock_github({
+        "/repos/o/r/issues/7": {
+            "title": "Orphaned issue",
+            "body": "Reporter deleted",
+            "labels": [],
+            "state": "open",
+            "user": None,
+            "comments": 1,
+        },
+        "/repos/o/r/issues/7/comments": [
+            {"user": None, "body": "Anonymous follow-up", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "/repos/o/r": {},
+        "/repos/o/r/contents": [],
+    })
+    result = await _call_tool_compat(
+        build_server(), "opencollab_generate_pr_plan",
+        {"params": {"owner": "o", "repo": "r", "issue_number": "7"}},
+    )
+    assert not result.is_error
+    plan = json.loads(_extract_text(result))
+    assert plan["issue"]["author"] == "unknown"
+    assert len(plan["comments"]) == 1
+    assert plan["comments"][0]["author"] == "unknown"
+    assert plan["comments"][0]["body"] == "Anonymous follow-up"
+
 
 @pytest.mark.asyncio
 async def test_impact_estimator_returns_structured_content(mock_github):

@@ -70,3 +70,43 @@ jobs:
 
       - name: Test installed CLI
         run: .smoke-venv/bin/opencollab-mcp --version
+
+  docker:
+    # Separate and non-required while it is being tuned, so it can't block unrelated PRs.
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Keep PR checks native and fast; tags build both architectures.
+          platforms: linux/amd64
+          load: true
+          tags: opencollab-mcp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run --version
+        run: docker run --rm opencollab-mcp:ci --version
+
+      - name: Start container without a token
+        run: docker run -d --name opencollab-ci -p 8000:8000 opencollab-mcp:ci
+
+      - name: Wait for healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' opencollab-ci)
+            echo "health: $status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 2
+          done
+          echo "Container did not become healthy within 60s" >&2
+          docker logs opencollab-ci
+          exit 1

@@ -9,7 +9,7 @@ from mcp.server.mcpserver import MCPServer
 
 from ..constants import RECENT_ISSUES_DAYS
 from ..github_client import github_get, github_search, handle_github_error
-from ..helpers import days_ago, difficulty_label, recent_date_str, truncate
+from ..helpers import blocking_labels_query, days_ago, difficulty_label, recent_date_str, truncate
 from ..models import LanguageInput, MatchMeInput
 
 _FIND_ISSUES_SORT_MAPPINGS: dict[str, dict[str, str]] = {
@@ -51,6 +51,7 @@ def register(mcp: MCPServer) -> None:
             # `language:Jupyter` plus a free-text `Notebook`.
             *(f'language:"{language}"' for language in languages),
             label,
+            blocking_labels_query(),
             "state:open",
             "no:assignee",
             # /search/issues returns pull requests too, and a PR carrying the
@@ -132,6 +133,21 @@ def register(mcp: MCPServer) -> None:
         except Exception as e:
             return handle_github_error(e)
 
+        # Orgs share the /users/{login} endpoint; matching their repos as a
+        # person's "skills" misleads the assistant into "based on your skills…".
+        if user.get("type") == "Organization":
+            return json.dumps(
+                {
+                    "error": (
+                        f"'{params.username}' is an organization, not a user. "
+                        "Pass a personal GitHub username, or use "
+                        f"opencollab_find_issues with scope='{params.username}' "
+                        "to search this org."
+                    ),
+                },
+                indent=2,
+            )
+
         lang_repos: dict[str, int] = {}
         topics_set: set[str] = set()
         for repo in repos_raw:
@@ -156,15 +172,35 @@ def register(mcp: MCPServer) -> None:
         # account, a fork-only account, an org-only contributor — would
         # otherwise be served Python issues as though Python had been detected.
         language_detected = bool(top_langs)
-        primary_lang = top_langs[0][0] if language_detected else "Python"
+        language_list = []
+        if language_detected:
+            language_list.append(languages[0]["name"])
+            language_list.extend(
+                language["name"]
+                for language in languages[1:3]
+                if language["percentage"] > 20
+            )
+        else:
+            language_list.append("Python")
+        primary_lang = language_list[0]
         since = recent_date_str(RECENT_ISSUES_DAYS)
         label = difficulty_label(params.difficulty)
-
         try:
+            query = " ".join([
+                *(f'language:"{language}"' for language in language_list),
+                label,
+                blocking_labels_query(),
+                "state:open",
+                "is:issue",
+                "no:assignee",
+                f"created:>{since}",
+                "is:public",
+                "archived:false",
+            ])
+
             result = await github_search(
                 "issues",
-                f'language:"{primary_lang}" {label} state:open '
-                f'is:issue no:assignee created:>{since} is:public archived:false',
+                query,
                 {"sort": "created", "order": "desc", "per_page": params.limit},
             )
         except Exception as e:
@@ -187,6 +223,7 @@ def register(mcp: MCPServer) -> None:
             "top_languages": languages,
             "topics": sorted(topics_set)[:10],
             "matched_language": primary_lang,
+            "matched_languages": language_list,
             "matched_issues": issues,
             "difficulty": params.difficulty,
         }

@@ -13,8 +13,9 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -25,6 +26,7 @@ from .constants import (
     GITHUB_API_BASE,
     GITHUB_API_VERSION,
     GITHUB_DEFAULT_MAX_PAGES,
+    GITHUB_MAX_REDIRECTS,
     GITHUB_RATE_LIMIT_WARNING_THRESHOLD,
     GITHUB_RETRY_DELAY_SECONDS,
     USER_AGENT,
@@ -115,6 +117,18 @@ def has_github_token() -> bool:
     return bool(_get_token())
 
 
+def token_source() -> str | None:
+    """Name of the environment variable supplying the token, or None.
+
+    `GITHUB_TOKEN` wins over `GH_TOKEN`, matching `_get_token`.
+    """
+    if os.environ.get("GITHUB_TOKEN", "").strip():
+        return "GITHUB_TOKEN"
+    if os.environ.get("GH_TOKEN", "").strip():
+        return "GH_TOKEN"
+    return None
+
+
 def _get_headers() -> dict[str, str]:
     """Build auth headers from environment."""
     # Strip whitespace: a token from a file or `$(cat token.txt)` often
@@ -144,6 +158,23 @@ def _validate_api_url(url: str) -> None:
         )
 
 
+async def _request_with_retry(
+    request: Callable[..., Awaitable[httpx.Response]],
+    url: str,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Share one retry between temporary HTTP statuses and transport failures."""
+    try:
+        response = await request(url, **kwargs)
+    except httpx.TransportError:
+        pass
+    else:
+        if response.status_code not in (502, 503, 504):
+            return response
+    await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+    return await request(url, **kwargs)
+
+
 async def _request(
     url: str,
     params: dict[str, Any] | None = None,
@@ -156,17 +187,23 @@ async def _request(
     non-JSON bodies return `({}, False, response)` so callers degrade gracefully
     without caching transient placeholders.
     """
-    _validate_api_url(url)
     target = label or url
 
-    for attempt in range(2):
-        req_kwargs: dict[str, Any] = {"headers": _get_headers()}
+    for redirects in range(GITHUB_MAX_REDIRECTS + 1):
+        # Validate every hop before building or sending authenticated requests.
+        _validate_api_url(url)
+        req_kwargs: dict[str, Any] = {"headers": _get_headers(), "follow_redirects": False}
         if params is not None:
             req_kwargs["params"] = params
-        resp = await _get_client().get(url, **req_kwargs)
-        if resp.status_code not in (502, 503, 504) or attempt == 1:
+        resp = await _request_with_retry(_get_client().get, url, **req_kwargs)
+
+        location = resp.headers.get("Location")
+        if resp.status_code not in (301, 302, 303, 307, 308) or not location:
             break
-        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+        if redirects == GITHUB_MAX_REDIRECTS:
+            raise httpx.TooManyRedirects("Too many GitHub API redirects", request=resp.request)
+        url = urljoin(str(resp.request.url), location)
+        params = None  # The Location URL owns the redirected request's query.
 
     resp.raise_for_status()
     _check_rate_limit(resp)
@@ -211,6 +248,24 @@ async def github_get(
     if use_cache and cacheable:
         _cache_set(key, data)
     return data
+
+
+async def github_get_response(
+    path: str,
+    params: dict[str, Any] | None = None,
+) -> tuple[Any, httpx.Response]:
+    """GET returning `(parsed JSON, response)` without caching.
+
+    For callers that need response headers (for example the
+    `x-oauth-scopes` header on `GET /user`), which `github_get` does not
+    expose.
+    """
+    data, _, resp = await _request(
+        f"{GITHUB_API_BASE}{path}",
+        params=params or {},
+        label=path,
+    )
+    return data, resp
 
 
 async def github_get_all(
@@ -304,15 +359,12 @@ async def github_graphql(
     them through `handle_github_error`.
     """
     body: dict[str, Any] = {"query": query, "variables": variables or {}}
-    for attempt in range(2):
-        resp = await _get_client().post(
-            f"{GITHUB_API_BASE}/graphql",
-            headers=_get_headers(),
-            json=body,
-        )
-        if resp.status_code not in (502, 503, 504) or attempt == 1:
-            break
-        await asyncio.sleep(GITHUB_RETRY_DELAY_SECONDS)
+    resp = await _request_with_retry(
+        _get_client().post,
+        f"{GITHUB_API_BASE}/graphql",
+        headers=_get_headers(),
+        json=body,
+    )
 
     resp.raise_for_status()
     _check_rate_limit(resp)
