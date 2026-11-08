@@ -232,7 +232,7 @@ The AI picks which tools to call based on what you ask.
 | Tool | What it does |
 |---|---|
 | `opencollab_match_me` | Reads your GitHub profile, detects your top languages, returns up to 10 matching unassigned issues (adjustable with `limit`, 1–30) — beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) or intermediate (`"help wanted", "help-wanted", "intermediate"`) via `difficulty` — all in one call. |
-| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for a given language, with beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) and intermediate (`"help wanted", "help-wanted", "intermediate"`) difficulty filters and sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
+| `opencollab_find_issues` | Up to 15 unassigned issues (adjustable with `limit`, 1–30) created within `max_age_days` (default 90, range 1–365) for up to 3 comma-separated languages, with beginner (`"good first issue", "good-first-issue", "beginner", "first-timers-only"`) and intermediate (`"help wanted", "help-wanted", "intermediate"`) difficulty filters. Supports sorting via `sort` (`newest` [default], `recently_updated`, or `least_discussed`). Optional `scope` narrows the search to an organization/user (`owner`) or a single repository (`owner/name`). Optional `exclude_repos` omits up to 10 `owner/name` repositories (default empty). Each issue includes `updated_days_ago` (days since last activity; `null` if missing or unparseable). |
 
 Both discovery tools exclude issues labelled `wontfix`, `won't fix`, `duplicate`,
 or `invalid`, including common hyphen/underscore variants. Custom label names
@@ -432,9 +432,7 @@ Already shipped (v0.6.0):
 
 Added in v0.7.0 (see the [Changelog](CHANGELOG.md)):
 
-- Migrated to the MCP 2.x server API
-- `GET /health` endpoint for the HTTP transports, used by the Docker `HEALTHCHECK`
-- Validated tool inputs: GitHub usernames, repo names and issue numbers are checked before any request
+See the [Changelog](CHANGELOG.md) for features and changes merged since v0.6.1.
 
 Open ideas:
 
