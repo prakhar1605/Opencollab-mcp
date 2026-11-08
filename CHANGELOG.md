@@ -56,8 +56,6 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `/health` endpoint, plus cache TTL and eviction tests ([#44](https://github.com/prakhar1605/Opencollab-mcp/pull/44))
 - Difficulty option for `opencollab_match_me`, matching `find_issues` ([#39](https://github.com/prakhar1605/Opencollab-mcp/pull/39))
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
-- Matched_Languages option for`opencollab_match_me`, matching `find_issues` (languages) (Issue [#179])
-- Optional `scope` parameter for `find_issues`, supporting an organization/user (`owner`) or a single repository (`owner/name`) ([#223](https://github.com/prakhar1605/Opencollab-mcp/pull/223)).
 ### Changed
 - `impact_estimator` visibility-score thresholds moved to named constants in `constants.py`, behaviour unchanged ([#270](https://github.com/prakhar1605/Opencollab-mcp/pull/270))
 - `repo_health` scoring thresholds moved to named constants in `constants.py`, behaviour unchanged ([#146](https://github.com/prakhar1605/Opencollab-mcp/pull/146))
@@ -72,7 +70,6 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - Version is now derived from package metadata instead of being copied ([#23](https://github.com/prakhar1605/Opencollab-mcp/pull/23))
 - `opencollab_match_me` now says so when it falls back to Python ([#25](https://github.com/prakhar1605/Opencollab-mcp/pull/25))
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
-- Difficulty searches now support multiple label variants for beginner and intermediate levels ([#225](https://github.com/prakhar1605/Opencollab-mcp/pull/225)).
 ### Fixed
 - Connection errors and timeouts are retried once, like 502/503/504 responses, for both REST and GraphQL ([#279](https://github.com/prakhar1605/Opencollab-mcp/pull/279))
 - The README's VS Code setup uses VS Code's own `mcp.json` format ([#278](https://github.com/prakhar1605/Opencollab-mcp/pull/278))
