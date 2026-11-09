@@ -146,12 +146,14 @@ def test_handle_github_error_404():
     assert "not found" in msg.lower()
 
 
-def test_handle_github_error_410_returns_deleted_issue_message_and_logs_warning(caplog):
+def test_handle_github_error_410_returns_gone_resource_message_and_logs_warning(caplog):
     with caplog.at_level(logging.WARNING, logger="opencollab_mcp.github"):
         msg = github_client.handle_github_error(_status_error(410))
 
+    assert "resource is gone" in msg.lower()
     assert "deleted" in msg.lower()
     assert "issues disabled" in msg.lower()
+
     records = [r for r in caplog.records if r.name == "opencollab_mcp.github"]
     assert records
     assert all(record.exc_info is None for record in records)
