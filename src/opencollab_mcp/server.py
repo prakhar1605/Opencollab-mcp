@@ -19,7 +19,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import JSONResponse
 
 from . import github_client
 from .constants import __version__
@@ -61,8 +61,8 @@ def build_server() -> MCPServer:
     issues.register(mcp)
 
     @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
-    async def health_check(_: Request) -> PlainTextResponse:
-        return PlainTextResponse("ok")
+    async def health_check(_: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok", "version": __version__})
 
     return mcp
 

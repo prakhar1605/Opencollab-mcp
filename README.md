@@ -169,7 +169,7 @@ docker run -e GITHUB_TOKEN=ghp_xxx -p 8000:8000 opencollab-mcp
 The container runs as a non-root user with `TRANSPORT=streamable-http` on port 8000.
 For an SSE client, use `-e TRANSPORT=sse`; both remote transports bind to
 `0.0.0.0` and accept `PORT` (default `8000`).
-`GET /health` returns `ok`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
+`GET /health` returns JSON `{"status": "ok", "version": "<installed version>"}`; the image's `HEALTHCHECK` probes it on the configured `PORT`.
 **Using Docker Compose**
 
 Create a `.env` file from the example:
@@ -346,7 +346,7 @@ The health check calls `/health` on `PORT` inside the container. Check that:
 2. `/health` responds:
 
    ```bash
-   curl localhost:8000/health   # expected output: ok
+   curl localhost:8000/health   # expected output: {"status": "ok", "version": "<installed version>"}
    ```
 
 3. The container is running in HTTP mode (`TRANSPORT=streamable-http`, the image default). In `stdio` mode there is no `/health` endpoint.
