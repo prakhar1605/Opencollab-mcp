@@ -50,5 +50,7 @@ async def test_all_bot_sample_does_not_award_merge_points(mock_github):
     })
     payload = json.loads(_extract_text(result))
     assert payload["details"]["bot_prs_excluded"] == 1
-    assert payload["details"]["pr_merge_rate_pct"] == 0
+    # Bot-only samples have no human closed PRs, so the rate is unknown.
+    assert payload["details"]["pr_merge_rate_pct"] is None
+    assert payload["details"]["pr_merge_rate_note"] == "no closed PRs yet"
     assert payload["health_score"] == 0

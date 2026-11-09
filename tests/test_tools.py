@@ -202,6 +202,28 @@ async def test_repo_health_scores_when_community_profile_is_not_found(mock_githu
 
 
 @pytest.mark.asyncio
+async def test_repo_health_merge_rate_is_unknown_without_closed_prs(mock_github):
+    """No closed PRs is missing data, not a 0% merge rate."""
+    mock_github({
+        "/repos/o/r": {},
+        "/repos/o/r/pulls": [],
+        # Community profile is left unmocked (fixture default 404).
+    })
+
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_repo_health",
+        {"params": {"owner": "o", "repo": "r"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    assert parsed["details"]["pr_merge_rate_pct"] is None
+    assert parsed["details"]["pr_merge_rate_note"] == "no closed PRs yet"
+    # Unknown merge rate earns no points; an empty repo stays at 0.
+    assert parsed["health_score"] == 0
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("archived", [True, False, None])
 @pytest.mark.parametrize("merged", [False, True])
 async def test_repo_health_reports_archived_status(mock_github, archived, merged):
