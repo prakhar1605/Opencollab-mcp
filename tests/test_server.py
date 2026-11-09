@@ -6,6 +6,7 @@ import logging
 import sys
 
 import pytest
+from starlette.testclient import TestClient
 
 from opencollab_mcp import server
 from opencollab_mcp.constants import __version__
@@ -126,3 +127,12 @@ def test_help_lists_environment_without_starting_server(monkeypatch, capsys, fla
     assert "synthetic-token-must-not-appear" not in captured.out
     assert captured.err == ""
     assert calls == []
+
+
+def test_health_endpoint_returns_status_and_version():
+    """GET /health returns 200 with status ok and the installed version."""
+    app = server.mcp.streamable_http_app()
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": __version__}
