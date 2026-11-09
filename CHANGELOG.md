@@ -26,6 +26,7 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `docker-compose.yml` example and README instructions for the HTTP transport ([#218](https://github.com/prakhar1605/Opencollab-mcp/pull/218))
 - `find_issues` reports `updated_days_ago` (days since last activity, `null` when missing) for each issue ([#217](https://github.com/prakhar1605/Opencollab-mcp/pull/217))
 - `opencollab_match_me` searches the user's top language plus up to two more that make up over 20% of their repositories; the response adds `matched_languages` ([#281](https://github.com/prakhar1605/Opencollab-mcp/pull/281))
+- `GET /health` returns JSON with the status and the installed version, e.g. `{"status": "ok", "version": "0.7.0"}` ([#265](https://github.com/prakhar1605/Opencollab-mcp/pull/265))
 - `opencollab-mcp --check` verifies the token, scopes and rate limit, then exits ([#277](https://github.com/prakhar1605/Opencollab-mcp/pull/277))
 - `parse_github_url` helper that parses repository, issue and pull request URLs without network calls ([#201](https://github.com/prakhar1605/Opencollab-mcp/pull/201))
 - `.dockerignore` keeps the Docker build context small ([#202](https://github.com/prakhar1605/Opencollab-mcp/pull/202))
