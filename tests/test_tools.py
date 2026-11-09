@@ -97,6 +97,53 @@ async def test_impact_estimator_low_stars(mock_github):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("description", [None, ""])
+async def test_impact_estimator_low_stars_without_description(mock_github, description):
+    """A blank description must not leave a dangling dash on the resume line."""
+    mock_github({
+        "/repos/me/tinylib": {
+            "stargazers_count": 5,
+            "forks_count": 0,
+            "subscribers_count": 0,
+            "open_issues_count": 0,
+            "description": description,
+            "topics": [],
+        }
+    })
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "me", "repo": "tinylib"}},
+    )
+    resume = json.loads(_extract_text(result))["suggested_resume_line"]
+    assert resume == "Open-source contributor to me/tinylib"
+    assert not resume.endswith("—")
+    assert not resume.endswith(" ")
+
+
+@pytest.mark.asyncio
+async def test_impact_estimator_low_stars_truncates_long_description(mock_github):
+    description = "x" * 100
+    mock_github({
+        "/repos/me/tinylib": {
+            "stargazers_count": 5,
+            "forks_count": 0,
+            "subscribers_count": 0,
+            "open_issues_count": 0,
+            "description": description,
+            "topics": [],
+        }
+    })
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "me", "repo": "tinylib"}},
+    )
+    resume = json.loads(_extract_text(result))["suggested_resume_line"]
+    assert resume == f"Open-source contributor to me/tinylib — {'x' * 80}…"
+
+
+@pytest.mark.asyncio
 async def test_impact_estimator_massive_stars(mock_github):
     mock_github({
         "/repos/big/famous": {

@@ -65,7 +65,7 @@ from ..constants import (
     VISIBILITY_WATCHERS_PER_POINT,
 )
 from ..github_client import github_get, handle_github_error
-from ..helpers import days_ago
+from ..helpers import days_ago, truncate
 from ..models import ImpactEstimate, RepoInput
 
 
@@ -222,7 +222,8 @@ def register(mcp: MCPServer) -> None:
     ) -> Annotated[CallToolResult, ImpactEstimate]:
         """Estimate the impact of contributing to a specific repository.
 
-        Produces an impact tier and a suggested resume line for active repositories.
+        Produces an impact tier (MASSIVE/HIGH/MEDIUM/MODERATE/LOW) and a
+        suggested resume line for active repositories.
         Archived repositories are flagged as read-only and receive no resume line.
         """
         path = f"/repos/{params.owner}/{params.repo}"
@@ -260,7 +261,10 @@ def register(mcp: MCPServer) -> None:
         elif stars >= IMPACT_MEDIUM_STARS:
             resume_line = f"Contributed to {repo_name} ({stars:,}+ stars), reaching {reach}"
         else:
-            resume_line = f"Open-source contributor to {repo_name} — {description[:80]}"
+            summary = truncate(description, 80)
+            resume_line = f"Open-source contributor to {repo_name}"
+            if summary:
+                resume_line = f"{resume_line} — {summary}"
 
         visibility = min(
             (min(stars // VISIBILITY_STARS_PER_POINT, VISIBILITY_STARS_MAX_POINTS) if stars >= VISIBILITY_STARS_MIN else 0)
