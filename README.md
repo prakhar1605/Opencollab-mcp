@@ -338,6 +338,52 @@ Error: GitHub API rate limit exceeded. Resets in ~N minutes. Set GITHUB_TOKEN fo
 
 Fix: set `GITHUB_TOKEN` (see [Authentication & rate limits](#authentication--rate-limits)). Without a token you get 60 requests/hour; with one, 5,000. If the token is already set, restart your MCP client so it picks up the environment variable.
 
+### Behind a proxy / custom certificates
+
+HTTPX respects `HTTPS_PROXY` for HTTPS requests, `NO_PROXY` for hosts that bypass the proxy, and `SSL_CERT_FILE` or `SSL_CERT_DIR` for custom CA certificates. If both certificate variables are set, HTTPX uses `SSL_CERT_FILE`. `REQUESTS_CA_BUNDLE` is not used by HTTPX. See the [HTTPX environment variables docs](https://www.python-httpx.org/environment_variables/).
+
+For example, add the settings you need to Claude Desktop's config:
+
+```json
+{
+  "mcpServers": {
+    "opencollab": {
+      "command": "uvx",
+      "args": ["opencollab-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here",
+        "HTTPS_PROXY": "http://proxy.example.com:8080",
+        "NO_PROXY": "localhost,127.0.0.1",
+        "SSL_CERT_FILE": "/path/to/ca-bundle.pem",
+        "SSL_CERT_DIR": "/path/to/certificates"
+      }
+    }
+  }
+}
+```
+
+Replace the example values, omit settings you don't need, and restart Claude Desktop. To test the same proxy and CA bundle in a terminal first:
+
+```bash
+export HTTPS_PROXY="http://proxy.example.com:8080"
+export NO_PROXY="localhost,127.0.0.1"
+export SSL_CERT_FILE="/path/to/ca-bundle.pem"
+export SSL_CERT_DIR="/path/to/certificates"
+curl --cacert "$SSL_CERT_FILE" https://api.github.com/rate_limit
+```
+
+In Windows PowerShell:
+
+```powershell
+$env:HTTPS_PROXY = "http://proxy.example.com:8080"
+$env:NO_PROXY = "localhost,127.0.0.1"
+$env:SSL_CERT_FILE = "C:\path\to\ca-bundle.pem"
+$env:SSL_CERT_DIR = "C:\path\to\certificates"
+curl.exe --cacert $env:SSL_CERT_FILE https://api.github.com/rate_limit
+```
+
+If using only `SSL_CERT_DIR`, use `--capath` with that directory instead of `--cacert` (subject to your curl TLS backend's support).
+
 ### Docker container shows "unhealthy"
 
 The health check calls `/health` on `PORT` inside the container. Check that:
