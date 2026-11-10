@@ -137,15 +137,28 @@ def register(mcp: MCPServer) -> None:
         ]
         details["bot_prs_excluded"] = len(pulls) - len(human_pulls)
         merged_count = sum(1 for p in human_pulls if p.get("merged_at"))
-        total_closed = len(human_pulls)
-        merge_rate = round(merged_count / max(total_closed, 1) * 100, 1)
-        if merge_rate >= HEALTH_MERGE_RATE_HIGH:
-            score += HEALTH_POINTS_MERGE_RATE_HIGH
-        elif merge_rate >= HEALTH_MERGE_RATE_MEDIUM:
-            score += HEALTH_POINTS_MERGE_RATE_MEDIUM
-        elif merge_rate > 0:
-            score += HEALTH_POINTS_MERGE_RATE_LOW
-        details["pr_merge_rate_pct"] = merge_rate
+        total_closed = len(pulls)
+
+        if total_closed == 0:
+            details["pr_merge_rate_pct"] = None
+            details["pr_merge_rate_note"] = "no closed human PRs yet"
+
+        elif not human_pulls:
+            details["pr_merge_rate_pct"] = 0.0
+
+        else:
+            merge_rate = round(
+                merged_count / len(human_pulls) * 100, 1
+            )
+
+            if merge_rate >= HEALTH_MERGE_RATE_HIGH:
+                score += HEALTH_POINTS_MERGE_RATE_HIGH
+            elif merge_rate >= HEALTH_MERGE_RATE_MEDIUM:
+                score += HEALTH_POINTS_MERGE_RATE_MEDIUM
+            elif merge_rate > 0:
+                score += HEALTH_POINTS_MERGE_RATE_LOW
+
+            details["pr_merge_rate_pct"] = merge_rate
 
         has_issues = bool(repo.get("has_issues", True))
         details["has_issues"] = has_issues
