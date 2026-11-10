@@ -72,6 +72,8 @@ particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://gi
 - `opencollab_match_me` now says so when it falls back to Python ([#25](https://github.com/prakhar1605/Opencollab-mcp/pull/25))
 - Contributing guidelines are also looked up in `.github/` and `docs/` ([#38](https://github.com/prakhar1605/Opencollab-mcp/pull/38))
 ### Fixed
+- `repo_health` reports `pr_merge_rate_pct: null` with a note, instead of 0%, when a repository has no closed pull requests yet ([#286](https://github.com/prakhar1605/Opencollab-mcp/pull/286))
+- HTTP 410 and 451 responses get readable error messages ([#274](https://github.com/prakhar1605/Opencollab-mcp/pull/274))
 - Connection errors and timeouts are retried once, like 502/503/504 responses, for both REST and GraphQL ([#279](https://github.com/prakhar1605/Opencollab-mcp/pull/279))
 - The README's VS Code setup uses VS Code's own `mcp.json` format ([#278](https://github.com/prakhar1605/Opencollab-mcp/pull/278))
 - Renamed or transferred repositories work: GET redirects are followed within the GitHub API origin, validated before every authenticated request ([#275](https://github.com/prakhar1605/Opencollab-mcp/pull/275))
