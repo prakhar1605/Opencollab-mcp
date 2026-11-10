@@ -545,8 +545,18 @@ def handle_github_error(e: Exception) -> str:
                     "private.")
         if code == 404:
             return "Error: Resource not found on GitHub. Double-check the username or repo name."
+        if code == 410:
+            return (
+                "Error: This resource is gone. "
+                "It may have been deleted, or the repository has Issues disabled."
+            )
         if code == 422:
             return f"Error: GitHub rejected the request — {_validation_message(e.response)}"
+        if code == 451:
+            return (
+                "Error: This resource is unavailable due to legal restrictions. "
+                "e.g. DMCA takedown or other government action."
+            )
         return f"Error: GitHub API returned status {code}."
     if isinstance(e, httpx.TimeoutException):
         return "Error: GitHub API request timed out. Please try again."

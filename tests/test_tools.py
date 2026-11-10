@@ -197,6 +197,10 @@ async def test_repo_health_scores_when_community_profile_is_not_found(mock_githu
 
     parsed = json.loads(_extract_text(result))
     assert isinstance(parsed["health_score"], int)
+    assert parsed["details"]["pr_merge_rate_pct"] is None
+    assert parsed["details"]["pr_merge_rate_note"] == (
+        "no closed human PRs yet"
+    )
     assert parsed["details"]["community_profile_available"] is False
     assert not any(parsed["details"]["community_files"].values())
 
