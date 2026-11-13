@@ -86,14 +86,9 @@ Use the same JSON as above in your Cursor MCP config file (`.cursor/mcp.json`).
 
 Add the server to your Windsurf MCP config file (`mcp_config.json`).
 
-The main, Cascade-managed config file is opened via Cascade → MCP → "Open MCP config file":
+Open the MCP configuration file from Windsurf using Cascade → MCP → **Open MCP config file**. This opens the configuration file managed by Windsurf.
 
-- **macOS/Linux:** `~/.config/devin/mcp_config.json` (or `$XDG_CONFIG_HOME/devin/mcp_config.json`)
-- **Windows:** `%APPDATA%\devin\mcp_config.json`
-
-Separately, Windsurf can also *discover* servers from an editor discovery file (optional — enable via Settings → `chat.mcp.discovery.enabled` → "Devin configurations"):
-
-- `~/.codeium/windsurf/mcp_config.json` (stable) or `~/.codeium/windsurf-next/mcp_config.json` (Next)
+The exact filesystem location may vary by installation. The paths listed in earlier versions of this guide have not been independently verified against the current official documentation.
 
 Paste this (replace `your_token_here` with the token from Step 1):
 
@@ -103,8 +98,6 @@ Paste this (replace `your_token_here` with the token from Step 1):
     "opencollab": {
       "command": "uvx",
       "args": [
-        "--with",
-        "mcp<2",
         "opencollab-mcp"
       ],
       "env": {
@@ -130,8 +123,6 @@ Paste this (replace `your_token_here` with the token from Step 1). Set the token
     "opencollab": {
       "command": "uvx",
       "args": [
-        "--with",
-        "mcp<2",
         "opencollab-mcp"
       ],
       "env": {
@@ -160,8 +151,6 @@ Paste this (replace `your_token_here` with the token from Step 1):
     "opencollab": {
       "command": "uvx",
       "args": [
-        "--with",
-        "mcp<2",
         "opencollab-mcp"
       ],
       "env": {
@@ -187,8 +176,6 @@ mcpServers:
   - name: opencollab
     command: uvx
     args:
-      - --with
-      - "mcp<2"
       - opencollab-mcp
     env:
       GITHUB_TOKEN: "your_token_here"
