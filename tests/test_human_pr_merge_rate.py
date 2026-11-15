@@ -36,6 +36,8 @@ async def test_health_merge_rate_excludes_bot_authors(mock_github, bot_merged):
     assert payload["details"]["bot_prs_excluded"] == 3
     # With an otherwise empty repo, only the 50% merge-rate tier earns points.
     assert payload["health_score"] == 12
+    assert payload["score_breakdown"]["merge_rate"] == 12
+    assert sum(payload["score_breakdown"].values()) == payload["health_score"]
 
 
 @pytest.mark.asyncio
@@ -52,3 +54,4 @@ async def test_all_bot_sample_does_not_award_merge_points(mock_github):
     assert payload["details"]["bot_prs_excluded"] == 1
     assert payload["details"]["pr_merge_rate_pct"] == 0
     assert payload["health_score"] == 0
+    assert payload["score_breakdown"]["merge_rate"] == 0

@@ -22,6 +22,7 @@ Changes merged since v0.6.1.
 - Difficulty filter for issue discovery ([#27](https://github.com/prakhar1605/Opencollab-mcp/pull/27))
 - Matched_Languages option for`opencollab_match_me`, matching `find_issues` (languages) (Issue [#179])
 - Optional `scope` parameter for `find_issues`, supporting an organization/user (`owner`) or a single repository (`owner/name`) ([#223](https://github.com/prakhar1605/Opencollab-mcp/pull/223)).
+- `opencollab_repo_health` returns an additive `score_breakdown` (points earned per factor) and a `capped` flag, so users can see why a repository scored what it did; `health_score`, `details` and `verdict` are unchanged ([#245](https://github.com/prakhar1605/Opencollab-mcp/issues/245)).
 ### Changed
 - CI test job now also runs on `windows-latest` and `macos-latest` (Python 3.12 only); Ubuntu still covers Python 3.10-3.13 ([#183](https://github.com/prakhar1605/Opencollab-mcp/issues/183))
 - `opencollab_impact_estimator` now returns MCP structured output (`structuredContent` plus a published `outputSchema`) while keeping the JSON text content; GitHub errors are now returned as tool errors (`isError`) ([#141](https://github.com/prakhar1605/Opencollab-mcp/issues/141))

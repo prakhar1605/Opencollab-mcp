@@ -251,7 +251,7 @@ the separate Python fallback note still appears when no language is detected.
 
 | Tool | What it does |
 |---|---|
-| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. |
+| `opencollab_repo_health` | 0–100 contributor-friendliness score: activity, PR merge rate, community files, forks. Archived repos get an "Archived — read-only" verdict; `community_profile_available` says whether community-file data could be read. `score_breakdown` lists the points earned by each factor, and `capped` flags when their raw total exceeded `HEALTH_MAX_SCORE` (the breakdown stays uncapped; `health_score` is capped). |
 | `opencollab_impact_estimator` | Impact tier (LOW → MASSIVE) based on stars + reach, plus a draft resume line. |
 
 </details>
