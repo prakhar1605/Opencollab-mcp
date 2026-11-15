@@ -15,6 +15,7 @@ tagged or published, so 0.7.0 also brings their changes to `pip` / `uvx` users. 
 particular it fixes the startup crash of 0.5.0 under `mcp` 2.x ([#79](https://github.com/prakhar1605/Opencollab-mcp/issues/79)).
 
 ### Added
+- Troubleshooting entry for corporate proxies and custom CA certificates ([#287](https://github.com/prakhar1605/Opencollab-mcp/pull/287))
 - CI builds the Docker image on pull requests and checks that the container becomes healthy ([#268](https://github.com/prakhar1605/Opencollab-mcp/pull/268))
 - Issue discovery also matches common label spellings (`good-first-issue`, `beginner`, `first-timers-only`; `help-wanted`, `intermediate`) ([#225](https://github.com/prakhar1605/Opencollab-mcp/pull/225))
 - Optional `scope` (an owner or `owner/name`) for `opencollab_find_issues` ([#223](https://github.com/prakhar1605/Opencollab-mcp/pull/223))
