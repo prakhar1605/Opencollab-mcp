@@ -108,26 +108,36 @@ def register(mcp: MCPServer) -> None:
         except Exception as e:
             return handle_github_error(e)
 
-        score = 0
+        # Raw points earned per factor, before the overall HEALTH_MAX_SCORE cap.
+        # `score` is derived from these so the breakdown always reconciles.
+        breakdown: dict[str, int] = {
+            "activity": 0,
+            "stars": 0,
+            "merge_rate": 0,
+            "open_issues": 0,
+            "community_files": 0,
+            "metadata": 0,
+            "forks": 0,
+        }
         details: dict[str, object] = {"archived": bool(repo.get("archived", False))}
 
         last_push_days = days_ago(repo.get("pushed_at"))
         if last_push_days is not None:
             if last_push_days <= HEALTH_PUSH_DAYS_RECENT:
-                score += HEALTH_POINTS_PUSH_RECENT
+                breakdown["activity"] += HEALTH_POINTS_PUSH_RECENT
             elif last_push_days <= HEALTH_PUSH_DAYS_ACTIVE:
-                score += HEALTH_POINTS_PUSH_ACTIVE
+                breakdown["activity"] += HEALTH_POINTS_PUSH_ACTIVE
             elif last_push_days <= HEALTH_PUSH_DAYS_STALE:
-                score += HEALTH_POINTS_PUSH_STALE
+                breakdown["activity"] += HEALTH_POINTS_PUSH_STALE
         details["last_push_days_ago"] = last_push_days
 
         stars = repo.get("stargazers_count", 0)
         if stars >= HEALTH_STARS_HIGH:
-            score += HEALTH_POINTS_STARS_HIGH
+            breakdown["stars"] += HEALTH_POINTS_STARS_HIGH
         elif stars >= HEALTH_STARS_MEDIUM:
-            score += HEALTH_POINTS_STARS_MEDIUM
+            breakdown["stars"] += HEALTH_POINTS_STARS_MEDIUM
         elif stars >= HEALTH_STARS_LOW:
-            score += HEALTH_POINTS_STARS_LOW
+            breakdown["stars"] += HEALTH_POINTS_STARS_LOW
         details["stars"] = stars
 
         human_pulls = [
@@ -152,11 +162,11 @@ def register(mcp: MCPServer) -> None:
             )
 
             if merge_rate >= HEALTH_MERGE_RATE_HIGH:
-                score += HEALTH_POINTS_MERGE_RATE_HIGH
+                breakdown["merge_rate"] += HEALTH_POINTS_MERGE_RATE_HIGH
             elif merge_rate >= HEALTH_MERGE_RATE_MEDIUM:
-                score += HEALTH_POINTS_MERGE_RATE_MEDIUM
+                breakdown["merge_rate"] += HEALTH_POINTS_MERGE_RATE_MEDIUM
             elif merge_rate > 0:
-                score += HEALTH_POINTS_MERGE_RATE_LOW
+                breakdown["merge_rate"] += HEALTH_POINTS_MERGE_RATE_LOW
 
             details["pr_merge_rate_pct"] = merge_rate
 
@@ -169,9 +179,9 @@ def register(mcp: MCPServer) -> None:
                 "Issues are disabled on GitHub — check the README for where this project tracks work"
             )
         if HEALTH_OPEN_ISSUES_MIN <= open_issues <= HEALTH_OPEN_ISSUES_MAX:
-            score += HEALTH_POINTS_OPEN_ISSUES_OPTIMAL
+            breakdown["open_issues"] += HEALTH_POINTS_OPEN_ISSUES_OPTIMAL
         elif open_issues > 0:
-            score += HEALTH_POINTS_OPEN_ISSUES_ANY
+            breakdown["open_issues"] += HEALTH_POINTS_OPEN_ISSUES_ANY
         details["open_issues"] = open_issues
 
         files_info = community.get("files", {}) if isinstance(community, dict) else {}
@@ -184,25 +194,28 @@ def register(mcp: MCPServer) -> None:
             "issue_template": files_info.get("issue_template") is not None,
             "pull_request_template": files_info.get("pull_request_template") is not None,
         }
-        score += min(
+        breakdown["community_files"] += min(
             sum(community_files.values()) * HEALTH_POINTS_PER_COMMUNITY_FILE,
             HEALTH_MAX_COMMUNITY_FILES_POINTS,
         )
         details["community_files"] = community_files
 
         if repo.get("description"):
-            score += HEALTH_POINTS_DESCRIPTION
+            breakdown["metadata"] += HEALTH_POINTS_DESCRIPTION
         if repo.get("topics"):
-            score += HEALTH_POINTS_TOPICS
+            breakdown["metadata"] += HEALTH_POINTS_TOPICS
 
         forks = repo.get("forks_count", 0)
         if forks >= HEALTH_FORKS_HIGH:
-            score += HEALTH_POINTS_FORKS_HIGH
+            breakdown["forks"] += HEALTH_POINTS_FORKS_HIGH
         elif forks >= HEALTH_FORKS_MEDIUM:
-            score += HEALTH_POINTS_FORKS_MEDIUM
+            breakdown["forks"] += HEALTH_POINTS_FORKS_MEDIUM
         elif forks >= HEALTH_FORKS_LOW:
-            score += HEALTH_POINTS_FORKS_LOW
-        score = min(score, HEALTH_MAX_SCORE)
+            breakdown["forks"] += HEALTH_POINTS_FORKS_LOW
+
+        raw_total = sum(breakdown.values())
+        score = min(raw_total, HEALTH_MAX_SCORE)
+        capped = raw_total > HEALTH_MAX_SCORE
 
         if details["archived"]:
             verdict = "Archived — read-only, cannot accept contributions"
@@ -218,6 +231,8 @@ def register(mcp: MCPServer) -> None:
         return json.dumps({
             "repo": f"{params.owner}/{params.repo}",
             "health_score": score,
+            "score_breakdown": breakdown,
+            "capped": capped,
             "verdict": verdict,
             "details": details,
         }, indent=2)
