@@ -97,6 +97,53 @@ async def test_impact_estimator_low_stars(mock_github):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("description", "expected_line"),
+    [
+        (
+            None,
+            "Open-source contributor to me/tinylib",
+        ),
+        (
+            "",
+            "Open-source contributor to me/tinylib",
+        ),
+        (
+            "A" * 100,
+            f"Open-source contributor to me/tinylib — {'A' * 80}…",
+        ),
+    ],
+)
+async def test_impact_estimator_resume_line(
+    mock_github, description, expected_line
+):
+    mock_github(
+        {
+            "/repos/me/tinylib": {
+                "stargazers_count": 5,
+                "forks_count": 0,
+                "subscribers_count": 0,
+                "open_issues_count": 0,
+                "description": description,
+                "topics": [],
+            }
+        }
+    )
+
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "me", "repo": "tinylib"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    resume_line = parsed["suggested_resume_line"]
+
+    assert resume_line == expected_line
+    assert not resume_line.endswith(("—", " "))
+
+
+@pytest.mark.asyncio
 async def test_impact_estimator_massive_stars(mock_github):
     mock_github({
         "/repos/big/famous": {
