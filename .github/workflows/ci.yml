@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# New PR pushes cancel earlier runs for that PR, while each main push gets its own
+# group and runs without cancellation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     # Ubuntu keeps the plain `test (3.x)` names that branch protection requires;

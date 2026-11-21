@@ -97,6 +97,53 @@ async def test_impact_estimator_low_stars(mock_github):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("description", "expected_line"),
+    [
+        (
+            None,
+            "Open-source contributor to me/tinylib",
+        ),
+        (
+            "",
+            "Open-source contributor to me/tinylib",
+        ),
+        (
+            "A" * 100,
+            f"Open-source contributor to me/tinylib — {'A' * 80}…",
+        ),
+    ],
+)
+async def test_impact_estimator_resume_line(
+    mock_github, description, expected_line
+):
+    mock_github(
+        {
+            "/repos/me/tinylib": {
+                "stargazers_count": 5,
+                "forks_count": 0,
+                "subscribers_count": 0,
+                "open_issues_count": 0,
+                "description": description,
+                "topics": [],
+            }
+        }
+    )
+
+    result = await _call_tool_compat(
+        build_server(),
+        "opencollab_impact_estimator",
+        {"params": {"owner": "me", "repo": "tinylib"}},
+    )
+
+    parsed = json.loads(_extract_text(result))
+    resume_line = parsed["suggested_resume_line"]
+
+    assert resume_line == expected_line
+    assert not resume_line.endswith(("—", " "))
+
+
+@pytest.mark.asyncio
 async def test_impact_estimator_massive_stars(mock_github):
     mock_github({
         "/repos/big/famous": {
@@ -203,6 +250,8 @@ async def test_repo_health_scores_when_community_profile_is_not_found(mock_githu
     )
     assert parsed["details"]["community_profile_available"] is False
     assert not any(parsed["details"]["community_files"].values())
+    assert parsed["score_breakdown"]["community_files"] == 0
+    assert sum(parsed["score_breakdown"].values()) == parsed["health_score"]
 
 
 @pytest.mark.asyncio
@@ -235,6 +284,8 @@ async def test_repo_health_reports_archived_status(mock_github, archived, merged
     parsed = json.loads(_extract_text(result))
     assert parsed["health_score"] == (80 if merged else 60)
     assert parsed["details"]["archived"] is (archived is True)
+    assert sum(parsed["score_breakdown"].values()) == parsed["health_score"]
+    assert parsed["capped"] is False
     if archived:
         assert parsed["verdict"] == "Archived — read-only, cannot accept contributions"
     elif merged:
@@ -266,6 +317,8 @@ async def test_repo_health_accounts_for_disabled_issues(
     assert parsed["details"]["has_issues"] is enabled
     assert parsed["health_score"] == 5 + (issue_points if enabled else 0)
     assert parsed["details"]["open_issues"] == (open_count if enabled else 0)
+    assert parsed["score_breakdown"]["open_issues"] == (issue_points if enabled else 0)
+    assert parsed["score_breakdown"]["stars"] == 5
     if enabled:
         assert "issues_note" not in parsed["details"]
     else:
@@ -349,6 +402,16 @@ async def test_repo_health_score_calculation(mock_github):
     parsed_active = json.loads(_extract_text(res_active))
     assert parsed_active["health_score"] == 100
     assert parsed_active["verdict"] == "Excellent — very contributor-friendly"
+    assert parsed_active["score_breakdown"] == {
+        "activity": 20,
+        "stars": 15,
+        "merge_rate": 20,
+        "open_issues": 10,
+        "community_files": 20,
+        "metadata": 5,
+        "forks": 10,
+    }
+    assert parsed_active["capped"] is False
 
     # Abandoned repo: 0
     res_abandoned = await _call_tool_compat(
@@ -359,6 +422,16 @@ async def test_repo_health_score_calculation(mock_github):
     parsed_abandoned = json.loads(_extract_text(res_abandoned))
     assert parsed_abandoned["health_score"] == 0
     assert parsed_abandoned["verdict"] == "Low — may be abandoned or hard to contribute to"
+    assert parsed_abandoned["score_breakdown"] == {
+        "activity": 0,
+        "stars": 0,
+        "merge_rate": 0,
+        "open_issues": 0,
+        "community_files": 0,
+        "metadata": 0,
+        "forks": 0,
+    }
+    assert parsed_abandoned["capped"] is False
 
 
 @pytest.mark.asyncio
